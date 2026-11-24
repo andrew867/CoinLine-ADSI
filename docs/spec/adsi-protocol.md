@@ -35,6 +35,8 @@ Separate the end of a software write from actual playback. Correlate the WebSock
 
 After retry success, allow the next data frame only when the media profile can separate any outstanding reply from a reply to that frame. Establish separation using a qualified bound on terminal and transport delay with a drain and guard interval, or trustworthy timing evidence that excludes the earlier spill as the cause. A local queue becoming empty is insufficient on its own. If separation cannot be established before sending the next frame, or becomes uncertain while awaiting the reply, keep the next softkey map inactive and enter recovery. Resume voice when the profile can restore it safely, otherwise end the call. Verify these transitions with [T04-A](../test/verification.md#t04-a-stale-d1-in-the-next-frame-acknowledgment-window).
 
+The gateway waits for both the media WebSocket and its ARI Stasis entry before adding the media leg to the bridge. Each queued playback begins with 100 ms of quiet PCM so the receiver can buffer before CAS, FSK or speech. The software load client uses 160 ms fixed playout buffering on the gateway lab route. The native reference uses 100 ms because it begins with a short CAS burst. The preroll is outside the encoded frame.
+
 ## SDC parameters
 
 Each parameter is a tag, one-byte payload size and payload. Encoders validate ranges before writing. Decoders validate frame size, checksum, and every parameter boundary before applying any state change. Unknown or unsupported parameters in a candidate screen fail it as a unit. Use printable ASCII for the first profile. Convert display text at the presentation layer, before calculating byte sizes. [Encoder reference](../sources.md#s2-adsi-server-reference)

@@ -18,12 +18,13 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from . import audio
-from .link import Link, LinkFailure
+from .link import LAB_PROMPTS, Link, LinkFailure
 
 
 LOG = logging.getLogger(__name__)
 APP = "coinline"
 MEDIA_FRAME_BYTES = 320
+MEDIA_PREROLL = bytes(5 * MEDIA_FRAME_BYTES)
 
 
 class Media:
@@ -38,7 +39,8 @@ class Media:
         correlator = uuid4().hex
         completion = loop.create_future()
         self.mark = (correlator, completion)
-        pcm += bytes(-len(pcm) % MEDIA_FRAME_BYTES)
+        # Idle WebSocket channels emit no PCM. Fill the receiver's playout buffer before the burst.
+        pcm = MEDIA_PREROLL + pcm + bytes(-len(pcm) % MEDIA_FRAME_BYTES)
         try:
             async with asyncio.timeout(len(pcm) / (2 * audio.RATE) + 2):
                 await self.socket.send_json({"command": "START_MEDIA_BUFFERING"})
@@ -73,6 +75,7 @@ class Admission:
     media_id: str
     bridge_id: str
     media: asyncio.Future[Media]
+    media_stasis: asyncio.Event
     task: asyncio.Task | None = None
     link: Link | None = None
 
@@ -92,6 +95,7 @@ class Gateway:
         self.pending: dict[str, Admission] = {}
         self.outcomes = Counter()
         self.latencies = deque(maxlen=256)
+        self.lab_audio: dict[str, bytes] = {}
 
     def status(self):
         samples = sorted(list(self.latencies)[-100:])
@@ -107,6 +111,7 @@ class Gateway:
     async def serve(self) -> None:
         address = self.base.replace("http", "ws", 1) + f"/ari/events?app={APP}"
         try:
+            self.lab_audio = {prompt: await audio.speech(prompt) for prompt in LAB_PROMPTS}
             while True:
                 try:
                     async with connect(address, additional_headers={"Authorization": self.authorization}, proxy=None) as ws:
@@ -131,7 +136,9 @@ class Gateway:
             return
         identifier = channel["id"]
         kind = event["type"]
-        if kind == "StasisStart" and event.get("args") and channel.get("name", "").startswith("PJSIP/"):
+        if kind == "StasisStart" and identifier in self.pending:
+            self.pending[identifier].media_stasis.set()
+        elif kind == "StasisStart" and event.get("args") and channel.get("name", "").startswith("PJSIP/"):
             if identifier in self.calls:
                 return
             if len(self.calls) >= self.limit:
@@ -140,7 +147,7 @@ class Gateway:
                     await self._request("DELETE", f"channels/{identifier}", reason="busy")
                 return
             loop = asyncio.get_running_loop()
-            call = Admission(identifier, uuid4().hex, uuid4().hex, loop.create_future())
+            call = Admission(identifier, uuid4().hex, uuid4().hex, loop.create_future(), asyncio.Event())
             self.calls[identifier] = self.pending[call.media_id] = call
             self.outcomes["admitted"] += 1
             caller = channel.get("caller", {}).get("number")
@@ -162,13 +169,16 @@ class Gateway:
         try:
             async with asyncio.timeout(5):
                 await self._request("POST", f"channels/{call.channel_id}/answer")
-                stage = "bridge"
+                stage = "bridge_create"
                 await self._request("POST", "bridges", bridgeId=call.bridge_id, type="mixing,proxy_media,dtmf_events")
-                stage = "media"
+                stage = "media_create"
                 await self._request("POST", "channels/externalMedia", app=APP, channelId=call.media_id,
                                     external_host="coinline_media", transport="websocket", encapsulation="none",
                                     format="slin", transport_data="f(json)")
+                stage = "media_ready"
                 media = await call.media
+                await call.media_stasis.wait()
+                stage = "bridge_join"
                 await self._request("POST", f"bridges/{call.bridge_id}/addChannel",
                                     channel=f"{call.channel_id},{call.media_id}")
             # Let the newly bridged RTP leg start delivering media before CAS.
@@ -177,7 +187,9 @@ class Gateway:
             call.link = Link(media.play, observe=self.latencies.append if route == "lab" else None)
 
             async def say(text):
-                pcm = await audio.speech(text)
+                pcm = self.lab_audio.get(text) if route == "lab" else None
+                if pcm is None:
+                    pcm = await audio.speech(text)
                 call.link.response_begin()
                 await media.play(pcm)
 
@@ -185,8 +197,9 @@ class Gateway:
                 await self.handler(route, caller, call.link, say)
         except (httpx.HTTPError, TimeoutError, RuntimeError, WebSocketDisconnect, OSError) as error:
             self.outcomes["failed"] += 1
-            self.outcomes[f"{stage}_{type(error).__name__}"] += 1
-            LOG.info("call ended at %s (%s)", stage, type(error).__name__)
+            failure = f"http_{error.response.status_code}" if isinstance(error, httpx.HTTPStatusError) else type(error).__name__
+            self.outcomes[f"{stage}_{failure}"] += 1
+            LOG.info("call ended at %s (%s)", stage, failure)
             if isinstance(error, LinkFailure) and call.link and not call.link.uncertain:
                 with suppress(LinkFailure, TimeoutError, RuntimeError, WebSocketDisconnect):
                     async with asyncio.timeout(2):

@@ -8,6 +8,10 @@ from . import audio, wire
 
 
 Play = Callable[[bytes], Awaitable[float]]
+LAB_RESTORED = "Voice restored. Goodbye."
+LAB_VOICE_MENU = "CoinLine. Press one to continue."
+LAB_VOICE_REPLY = "OK. Goodbye."
+LAB_PROMPTS = (LAB_RESTORED, LAB_VOICE_MENU, LAB_VOICE_REPLY)
 
 
 @dataclass(frozen=True)
@@ -135,9 +139,9 @@ async def lab_call(link: Link, say: Callable[[str], Awaitable[None]]) -> None:
         if await link.selection() == "1":
             await link.transfer(wire.OK)
         await link.release()
-        await say("Voice restored. Goodbye.")
+        await say(LAB_RESTORED)
         return
     link.open_voice_input()
-    await say("CoinLine. Press one to continue.")
+    await say(LAB_VOICE_MENU)
     if await link.selection() == "1":
-        await say("OK. Goodbye.")
+        await say(LAB_VOICE_REPLY)

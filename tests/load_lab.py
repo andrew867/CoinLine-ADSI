@@ -3,6 +3,7 @@
 import argparse
 import json
 import subprocess
+from uuid import uuid4
 
 import httpx
 
@@ -10,22 +11,31 @@ from live_api import lab_value
 
 
 def call_batch(samples, parallel):
-    # Each client process negotiates its own SIP and RTP sockets.
-    command = (
-        f"seq {samples} | xargs -P {parallel} -n 1 sh -c 'terminal-emu gateway lab' sh"
-    )
-    result = subprocess.run(
-        ["docker", "compose", "--profile", "verify", "run", "--rm", "-T", "--no-deps",
-         "--entrypoint", "sh", "terminal-emu", "-c", command],
-        capture_output=True, text=True, timeout=max(60, samples * 10 // parallel),
-    )
-    results = [json.loads(line) for line in result.stdout.splitlines() if line.startswith("{")]
+    workers = min(samples, parallel)
+    count, extra = divmod(samples, workers)
+    batches = [str(count + (index < extra)) for index in range(workers)]
+    # Every worker retains its own SIP stack and negotiates RTP for each new call.
+    command = (f'printf "%s\\n" {" ".join(batches)} | xargs -P {workers} -n 1 '
+               """sh -c 'ADSI_EMULATOR_CALLS="$1" exec terminal-emu gateway lab' sh""")
+    container = "coinline-adsi-load-" + uuid4().hex[:10]
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "--profile", "verify", "run", "--name", container, "--rm", "-T", "--no-deps",
+             "--entrypoint", "sh", "terminal-emu", "-c", command],
+            capture_output=True, text=True, timeout=60 + 20 * max(map(int, batches)),
+        )
+        output, status = result.stdout, result.returncode
+    except subprocess.TimeoutExpired as error:
+        subprocess.run(["docker", "stop", "--time", "1", container], timeout=15,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        output, status = (error.stdout or b"").decode(errors="replace"), 1
+    results = [json.loads(line) for line in output.splitlines() if line.startswith("{")]
     passed = sum(row.get("passed") is True for row in results)
     for failure in [row for row in results if row.get("passed") is not True][:3]:
         print(json.dumps({"failed_terminal": failure}))
     if len(results) != samples:
         print(json.dumps({"terminal_reports": len(results), "expected": samples}))
-    return passed, result.returncode
+    return passed, status
 
 
 def main():

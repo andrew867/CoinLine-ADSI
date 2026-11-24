@@ -10,7 +10,7 @@ SDC drives the live experience. Resident FDM features are an optional lab capabi
 | --- | --- |
 | TEL-01 | Accept authenticated lab SIP calls via Asterisk/PJSIP and exchange bidirectional 8 kHz media. Support file or PCM loopback as an independent diagnostic adapter. |
 | TEL-02 | Render SDC screens and keys, handle selections, release data mode and fall back to voice with bounded negotiation and cleanup. |
-| TEL-03 | Maintain separate emulator, Vista 350 and Millennium compatibility records. Each physical qualification is specific to its hardware, media path and profile. |
+| TEL-03 | Maintain separate emulator, Vista 350 and Millennium compatibility records. Each physical support badge requires a passing qualification for its hardware, media path and profile. |
 | TEL-04 | Support an explicitly enabled, profile-qualified FDM lab flow with durable terminal commit and abort verification. Keep graphics experimental until independently qualified. |
 | EMU-01 | Provide a standalone terminal client with a visual and headless mode. Both speak SIP and receive actual call audio. |
 | EMU-02 | Provide deterministic impairment and terminal behavior controls, independent framing checks, diagnostics and restartable FDM storage. |

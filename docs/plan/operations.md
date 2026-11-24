@@ -15,6 +15,17 @@ Provide a Linux `compose.yaml` at the repository root with a default synthetic l
 
 The web console binds to loopback in the default profile. A pilot sits behind a configured TLS reverse proxy and managed OIDC. Expose SIP and the declared narrow RTP range only where needed. Validate gateway address mappings through a two-way RTP test, including NAT if present. Keep Postgres, ARI and media sockets private. Use mounted secrets, controlled route enrollment and distinct credentials for gateway, app and admin. Give each container only the access it needs. The browser setup wizard configures applications, routes, profiles and providers using typed resource contracts, with a dry-run before applying changes.
 
+## Asterisk build and load allowlists
+
+Build both images from an exact Asterisk 22 release or commit. Start with optional Menuselect modules disabled and enable the declared feature set plus its required dependencies. Keep the build selection and runtime module list in version control for each image. Use `autoload=no` and explicit module entries in `modules.conf`; mark indispensable modules as required at startup. Resolve transitive dependencies against the pinned source and verify them with a real call. [Asterisk build and module sources](../sources.md#s1-asterisk-pjsip-ari-and-media)
+
+| Image | Minimum feature set |
+| --- | --- |
+| Runtime gateway | `chan_pjsip`, the PJSIP resources needed for the configured endpoint and authentication, PCMU/RTP, a dialplan loader, Stasis and the ARI endpoints used for channel, event and bridge control, the bridge and timing resources, and `chan_websocket` with its dependencies for PCM. CoinLine's service generates ADSI on this path. |
+| Native ADSI reference | `chan_pjsip` with the minimum SIP, RTP, codec and dialplan dependencies, `res_adsi`, and a lab-only dialplan trigger that calls the native ADSI routines. Add `app_adsiprog` when needed for the P4 FDM reference tests. Run the reference image on an isolated lab network. |
+
+Omit unused channel drivers, codecs, dialplan applications and connectors. Disable unused built-in services, including AMI. Keep ARI and the WebSocket listeners on the private network. The image check compares compiled, packaged and loaded module inventories against each reviewed allowlist and fails on missing requirements or unexpected additions. Verify SIP admission, media, ADSI signaling, voice fallback and teardown with the runtime gateway. Verify T09 with the reference image.
+
 ## Health, backups and release evidence
 
 - Monitor call attempts and outcomes, ADSI negotiation and retry counts, bridge lifetime, provider age/failure, queue overflow, concurrent sessions and API errors. Group by low-cardinality profile and version. Use short-lived opaque session correlation. Keep high-cardinality caller and provider values out of logs and metrics.

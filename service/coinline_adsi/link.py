@@ -27,6 +27,7 @@ class Link:
         self._probe_timeout = probe_timeout
         self._digits: asyncio.Queue[Digit] = asyncio.Queue(maxsize=64)
         self._input_since: float | None = None
+        self._last_ack = 0.0
         self.data_mode = False
         self.uncertain = False
 
@@ -66,6 +67,7 @@ class Link:
             if prefix.value != "D":
                 return False
             count = await self._digit(prefix.time, self._reply_timeout)
+            self._last_ack = count.time
             return count.value == "1"
         except TimeoutError:
             return False
@@ -88,6 +90,13 @@ class Link:
         if self.data_mode:
             await self.transfer(wire.RELEASE)
             self.data_mode = False
+
+    async def accept_download(self) -> bool:
+        self._input_since = None
+        try:
+            return (await self._digit(self._last_ack, self._reply_timeout)).value == "B"
+        except TimeoutError:
+            return False
 
     def open_voice_input(self) -> None:
         self._discard_input()

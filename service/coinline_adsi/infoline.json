@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "entry": "welcome",
+  "nodes": [
+    {
+      "id": "welcome",
+      "type": "menu",
+      "lines": [
+        "COINLINE INFOLINE",
+        "1 News     2 Wx",
+        "3 Stocks   4 Lotto",
+        "5 Ask      0 Exit"
+      ],
+      "prompt": "CoinLine InfoLine. Press one for news, two for weather, three for stocks, four for lottery, five for information, or zero to exit.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "News",
+          "target": "news"
+        },
+        {
+          "digit": "2",
+          "label": "Wx",
+          "target": "weather"
+        },
+        {
+          "digit": "3",
+          "label": "Stocks",
+          "target": "stocks"
+        },
+        {
+          "digit": "4",
+          "label": "Lotto",
+          "target": "lottery"
+        },
+        {
+          "digit": "5",
+          "label": "Ask",
+          "target": "help"
+        },
+        {
+          "digit": "0",
+          "label": "Exit",
+          "target": "end"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "news",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "atlantic"
+      },
+      "bind": "news",
+      "onOk": "news-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "news-result",
+      "type": "message",
+      "lines": [
+        "{{news.displayTitle}}",
+        "{{news.headline}}",
+        "{{news.localTime}}",
+        "{{news.source}}"
+      ],
+      "prompt": "{{news.displayTitle}}. {{news.headline}}. {{news.localTime}}. {{news.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "weather",
+      "type": "provider",
+      "operation": "weather.current",
+      "args": {
+        "site": "selected"
+      },
+      "bind": "weather",
+      "onOk": "weather-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "weather-result",
+      "type": "message",
+      "lines": [
+        "{{weather.displayTitle}}",
+        "{{weather.place}}",
+        "{{weather.temperatureText}}",
+        "{{weather.localTime}}"
+      ],
+      "prompt": "{{weather.displayTitle}}. {{weather.place}}. {{weather.temperatureText}}. {{weather.localTime}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "stocks",
+      "type": "provider",
+      "operation": "market.quote",
+      "args": {
+        "instrument": "TSX-DEMO"
+      },
+      "bind": "stocks",
+      "onOk": "stocks-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "stocks-result",
+      "type": "message",
+      "lines": [
+        "{{stocks.displayTitle}}",
+        "{{stocks.symbol}} {{stocks.priceText}}",
+        "{{stocks.delay}}",
+        "{{stocks.localTime}}"
+      ],
+      "prompt": "{{stocks.displayTitle}}. {{stocks.symbol}} {{stocks.priceText}}. {{stocks.delay}}. {{stocks.localTime}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "lottery",
+      "type": "provider",
+      "operation": "lottery.draw",
+      "args": {
+        "game": "atlantic-demo"
+      },
+      "bind": "lottery",
+      "onOk": "lottery-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "lottery-result",
+      "type": "message",
+      "lines": [
+        "{{lottery.displayTitle}}",
+        "{{lottery.drawDate}}",
+        "{{lottery.numbers}}",
+        "{{lottery.bonus}}"
+      ],
+      "prompt": "{{lottery.displayTitle}}. {{lottery.drawDate}}. {{lottery.numbers}}. {{lottery.bonus}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "help",
+      "type": "provider",
+      "operation": "assistant.answer",
+      "args": {
+        "question": "adsi"
+      },
+      "bind": "help",
+      "onOk": "help-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "help-result",
+      "type": "message",
+      "lines": [
+        "{{help.displayTitle}}",
+        "{{help.answer}}",
+        "{{help.source}}"
+      ],
+      "prompt": "{{help.displayTitle}}. {{help.answer}}. {{help.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "unavailable",
+      "type": "message",
+      "lines": [
+        "SERVICE UNAVAILABLE",
+        "0 Back"
+      ],
+      "prompt": "This service is unavailable. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "prompt": "Goodbye."
+    }
+  ]
+}

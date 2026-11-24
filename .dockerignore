@@ -1,0 +1,10 @@
+.git
+.env
+.env.*
+build
+local
+runs
+**/__pycache__
+**/node_modules
+**/dist
+**/.gitkeep

@@ -6,8 +6,11 @@
 **/node_modules/
 /build/
 /dist/
+**/dist/
 /runs/
 /local/
+/.playwright-cli/
+/output/
 *.pcap
 *.pcapng
 *.wav

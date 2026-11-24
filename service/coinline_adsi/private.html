@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoinLine Private Balance</title>
+<style>
+  body { max-width:38rem; margin:2rem auto; padding:0 1rem; background:#edf1f4; color:#20303e; font:16px system-ui }
+  section { background:#fff; padding:1rem; border:1px solid #cbd5de; margin-block:1rem; border-radius:6px }
+  label { display:grid; gap:.3rem; margin:.7rem 0 }
+  input,button,select { padding:.5rem; font:inherit }
+  output { display:block; font:bold 1.25rem monospace; padding:.5rem 0 }
+</style>
+<h1>Private balance</h1>
+<a href="/auth/login">Sign in</a>
+<p id="status" role="status"></p>
+<section>
+  <h2>Connect a SimpleFIN account</h2>
+  <form id="claim"><label>Setup Token<input id="token" type="password" autocomplete="off" required></label>
+    <button>Find accounts</button></form>
+  <form id="bind" hidden>
+    <label>Account<select id="account"></select></label>
+    <label>Display alias<input id="alias" maxlength="18" placeholder="Savings" required></label>
+    <label>Enrolled line number<input id="phone" maxlength="14" type="tel" required></label>
+    <button>Link account</button>
+  </form>
+  <button id="unlink" hidden>Unlink account</button>
+</section>
+<section>
+  <h2>Approve a call</h2>
+  <form id="approval">
+    <label>Challenge shown on the phone<input id="challenge" inputmode="numeric" maxlength="8" required></label>
+    <button>Show one-time code</button>
+  </form>
+  <output id="code" aria-live="polite"></output>
+</section>
+<script>
+  const byId = id => document.getElementById(id);
+  async function api(path, method="GET", payload) {
+    const result = await fetch("/api/v1/enrollment" + path, {
+      method, headers:{"X-Coinline-CSRF":"request","Content-Type":"application/json"},
+      body:payload === undefined ? undefined : JSON.stringify(payload),
+      cache:"no-store",
+    });
+    const data = await result.json();
+    if (!result.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The request could not be completed.");
+    return data;
+  }
+  function show(message) { byId("status").textContent = message; }
+  function error(reason) { show(reason.message); }
+  async function refresh() {
+    const state = await api("");
+    byId("unlink").hidden = !state.linked;
+    show(state.linked ? "Linked account: " + state.alias : "No account linked");
+  }
+  byId("claim").onsubmit = event => {
+    event.preventDefault();
+    const token = byId("token").value;
+    byId("token").value = "";
+    api("/bank-link", "POST", {token}).then(accounts => {
+      byId("account").replaceChildren(...accounts.map(account => new Option(account.label, account.id)));
+      byId("bind").hidden = false;
+    }).catch(error);
+  };
+  byId("bind").onsubmit = event => {
+    event.preventDefault();
+    api("", "PUT", {phone:byId("phone").value, alias:byId("alias").value, choice:byId("account").value})
+      .then(() => { byId("bind").hidden = true; byId("bind").reset(); return refresh(); }).catch(error);
+  };
+  byId("unlink").onclick = () => api("", "DELETE").then(refresh).catch(error);
+  byId("approval").onsubmit = event => {
+    event.preventDefault();
+    byId("code").textContent = "";
+    api("/call-approval", "POST", {challenge:byId("challenge").value})
+      .then(result => { byId("code").textContent = result.code; setTimeout(() => { byId("code").textContent = ""; }, 120000); })
+      .catch(error);
+  };
+  refresh().catch(error);
+</script>
+</html>

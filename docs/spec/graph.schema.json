@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CoinLine ADSI application graph v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "entry",
+    "nodes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "entry": {
+      "$ref": "#/$defs/id"
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/menu"
+          },
+          {
+            "$ref": "#/$defs/message"
+          },
+          {
+            "$ref": "#/$defs/provider"
+          },
+          {
+            "$ref": "#/$defs/end"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+    },
+    "lines": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 24,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400
+    },
+    "choice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "digit",
+        "label",
+        "target"
+      ],
+      "properties": {
+        "digit": {
+          "type": "string",
+          "pattern": "^[0-68]$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 18
+        },
+        "target": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "menu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "lines",
+        "prompt",
+        "choices",
+        "onTimeout"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "menu"
+        },
+        "lines": {
+          "$ref": "#/$defs/lines"
+        },
+        "prompt": {
+          "$ref": "#/$defs/prompt"
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/choice"
+          }
+        },
+        "onTimeout": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "lines",
+        "prompt",
+        "continue",
+        "onTimeout"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "message"
+        },
+        "lines": {
+          "$ref": "#/$defs/lines"
+        },
+        "prompt": {
+          "$ref": "#/$defs/prompt"
+        },
+        "continue": {
+          "$ref": "#/$defs/choice"
+        },
+        "onTimeout": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type",
+        "operation",
+        "args",
+        "bind",
+        "onOk",
+        "onUnavailable"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "provider"
+        },
+        "operation": {
+          "enum": [
+            "weather.current",
+            "weather.forecast",
+            "news.headlines",
+            "market.quote",
+            "lottery.draw",
+            "assistant.answer"
+          ]
+        },
+        "args": {
+          "type": "object",
+          "maxProperties": 8,
+          "propertyNames": {
+            "$ref": "#/$defs/id"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 128
+          }
+        },
+        "bind": {
+          "$ref": "#/$defs/id"
+        },
+        "onOk": {
+          "$ref": "#/$defs/id"
+        },
+        "onUnavailable": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "end": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "type": {
+          "const": "end"
+        },
+        "prompt": {
+          "$ref": "#/$defs/prompt"
+        }
+      }
+    }
+  }
+}

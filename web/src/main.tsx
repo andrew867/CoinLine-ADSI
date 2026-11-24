@@ -26,13 +26,14 @@ type Simulation = {
 };
 type Settings = { value: Record<string, unknown>; generation: number };
 type Route = { name: string; revision_id: string | null };
+type Telephony = { ready: boolean; active: number };
 type Point = { x: number; y: number };
 
 const operations: Record<string, string> = {
   "weather.current": "site", "weather.forecast": "site", "news.headlines": "topic",
   "market.quote": "instrument", "lottery.draw": "game", "assistant.answer": "question",
 };
-const titles = { menu: "Menu", message: "Screen", provider: "Data", end: "Hang up" };
+const titles = { menu: "Menu", message: "Screen", provider: "Data", end: "End call" };
 
 async function api<T>(path: string, method = "GET", body?: unknown, generation?: number): Promise<T> {
   const headers: Record<string, string> = { "X-Coinline-CSRF": "request" };
@@ -75,6 +76,7 @@ function App() {
   const [settings, setSettings] = useState<Settings>();
   const [configuration, setConfiguration] = useState("");
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [telephony, setTelephony] = useState<Telephony>();
   const [busy, setBusy] = useState(false);
   const [newName, setNewName] = useState("");
   const chosen = draft?.nodes.find((node) => node.id === nodeId);
@@ -95,13 +97,18 @@ function App() {
   async function refresh() {
     const list = await api<Application[]>("/apps");
     setApps(list);
-    if (!loaded && list.length) await select(list[0].id);
+    return list;
   }
   useEffect(() => {
     api("/session").then(() => setAuthenticated(true)).catch(() => {});
     api<{ oidc: boolean }>("/session/mode").then((mode) => setOidc(mode.oidc)).catch(() => {});
   }, []);
-  useEffect(() => { if (authenticated) void action(refresh); }, [authenticated]);
+  useEffect(() => {
+    if (authenticated) void action(async () => {
+      const list = await refresh();
+      if (list.length) await select(list[0].id);
+    });
+  }, [authenticated]);
   function edit(change: Partial<Node>) {
     if (draft && chosen) setDraft({ ...draft, nodes: draft.nodes.map((node) =>
       node.id === chosen.id ? { ...node, ...change } : node) });
@@ -138,8 +145,11 @@ function App() {
     if (stage) setStage(await api(`/simulations/${stage.id}/events`, "POST", event));
   }
   async function showSetup() {
-    const [config, routeList] = await Promise.all([api<Settings>("/providers"), api<Route[]>("/routes")]);
-    setSettings(config); setConfiguration(JSON.stringify(config.value, null, 2)); setRoutes(routeList); setPage("setup");
+    const [config, routeList, gateway] = await Promise.all([
+      api<Settings>("/providers"), api<Route[]>("/routes"), api<Telephony>("/telephony/status"),
+    ]);
+    setSettings(config); setConfiguration(JSON.stringify(config.value, null, 2)); setRoutes(routeList);
+    setTelephony(gateway); setPage("setup");
   }
 
   if (!authenticated) return <main className="login">
@@ -169,7 +179,9 @@ function App() {
     {status && <p className="notice" role="status">{status}</p>}
     {page === "setup" && <main className="setup">
       <h1>Setup</h1>
-      <section className="panel"><h2>Incoming routes</h2><dl><dt>6500</dt><dd>ADSI lab exchange</dd>
+      <section className="panel"><h2>Incoming routes</h2><dl><dt>Status</dt>
+        <dd>{telephony?.ready ? `Ready, ${telephony.active} active calls` : "Gateway unavailable"}</dd>
+        <dt>6500</dt><dd>ADSI lab exchange</dd>
         <dt>6501</dt><dd>{routes[0]?.revision_id ? "Published InfoLine revision" : "No active application"}</dd></dl></section>
       <section className="panel"><h2>Data providers</h2>
         <label>Provider configuration<textarea rows={15} value={configuration} spellCheck={false}
@@ -191,7 +203,7 @@ function App() {
       <aside className="catalogue">
         <h2>Applications</h2>
         <ul>{apps.map((entry) => <li key={entry.id}>
-          <button className={loaded?.id === entry.id ? "selected" : ""}
+          <button className={loaded?.id === entry.id ? "selected" : ""} disabled={busy}
             onClick={() => void action(() => select(entry.id))}>{entry.name}{entry.archived && " (archived)"}</button>
         </li>)}</ul>
         <form onSubmit={(event) => { event.preventDefault(); void action(async () => {
@@ -202,7 +214,7 @@ function App() {
             onChange={(event) => setNewName(event.target.value)} /></label>
           <button disabled={busy}>New application</button>
         </form>
-        <label className="import">Import graph<input type="file" accept=".json,application/json"
+        <label className="import">Import graph<input type="file" accept=".json,application/json" disabled={busy}
           onChange={(event) => { const file = event.target.files?.[0]; if (file) void action(async () => {
             const item = await api<Application>("/apps/import", "POST",
               { name: file.name.replace(/\.json$/, "").slice(0, 80), graph: JSON.parse(await file.text()) });

@@ -1,0 +1,65 @@
+{
+  "id": "single-softkey",
+  "transport": "sip-rtp",
+  "codec": "PCMU",
+  "expects": [
+    {
+      "from": "server",
+      "signal": "CAS"
+    },
+    {
+      "from": "terminal",
+      "digits": "A"
+    },
+    {
+      "from": "server",
+      "frame": "sdc-connect"
+    },
+    {
+      "from": "terminal",
+      "digits": "D1",
+      "terminalMode": "data"
+    },
+    {
+      "from": "server",
+      "frame": "sdc-lab-with-key"
+    },
+    {
+      "from": "terminal",
+      "digits": "D1",
+      "visibleLine": "LAB",
+      "softkey": {
+        "slot": 1,
+        "label": "Go"
+      }
+    },
+    {
+      "from": "terminal",
+      "action": "press-softkey-1",
+      "digits": "1"
+    },
+    {
+      "from": "server",
+      "frame": "sdc-ok"
+    },
+    {
+      "from": "terminal",
+      "digits": "D1",
+      "visibleLine": "OK"
+    },
+    {
+      "from": "server",
+      "frame": "sdc-release"
+    },
+    {
+      "from": "terminal",
+      "digits": "D1",
+      "terminalMode": "voice"
+    },
+    {
+      "from": "server",
+      "signal": "voice-prompt"
+    }
+  ],
+  "expectedApplicationTransitions": 1
+}

@@ -1,0 +1,70 @@
+# Verification and acceptance
+
+## Test environments
+
+Use deterministic clocks and independent intended results. Run unit tests on inputs and outputs, then transport tests across components, then actual call scenarios. An application preview drives graph events directly. The SIP emulator decodes audio received over RTP. Physical acceptance requires the named handset, analog path and media profile.
+
+| Environment | Setup and evidence |
+| --- | --- |
+| Byte and PCM | Decode independent golden bytes. Use the direct PCM adapter with synthetic media, explicit sample rates and seeded impairments. Report byte offsets, sample offsets, timing and state. |
+| Asterisk comparative | Pin a source commit and build its native ADSI modules for the test harness. Record the generated waveform, ordered terminal acknowledgments and decoded frames. Compare each direction where supported. |
+| SIP loop | Start the Compose lab, dial Asterisk from the standalone terminal, and observe RTP, call states, frames, softkeys and rendered screen. Add a plain SIP caller for voice fallback. Capture clock and transport metadata on both sides. |
+| Browser | Exercise administration and authoring with isolated data, fixed user roles and no live provider access. Run an authored revision through a SIP call after publish. |
+| Hardware | Connect the named terminal to a known FXS port in a closed lab. Record profile, build identifiers, ATA model/version, negotiated codec, digit mode and settings. Use synthetic caller identities and application contents. Capture from the gateway and observe the handset. |
+| Provider | Default to deterministic local fixtures. Test live adapters separately using approved accounts or approved feeds. Local failures include timeout, partial response, date/time anomalies and schema drift. |
+
+## Cases and pass criteria
+
+These cases are planned. The [fixture manifest](../../fixtures/README.md) describes currently checked-in inputs.
+
+Run the design preflight from the project root with Python 3.11 or later and the JSON Schema validator. On Windows, use the MSYS2 MINGW64 shell.
+
+```sh
+python -m pip install jsonschema==4.26.0
+python tests/check_design.py
+```
+
+| Case | Req. | Method and pass criteria |
+| --- | --- | --- |
+| T01 | TEL-02, EMU-02 | Compare the valid wire vectors byte by byte, assert declared lengths, checksum and complete parameter consumption. The terminal renders `LAB` and treats the key payload and release as specified. |
+| T02 | TEL-02, EMU-02 | Feed bad outer length, checksum, truncated TLV and unknown display tag. Add generated cases at 253 and 254 parameter bytes, short input and extra bytes. Reject each invalid frame, with no partial display or installed-state mutation. |
+| T03 | TEL-01, TEL-02, EMU-02 | Generate CAS and FSK on the direct PCM adapter. Independently check CAS frequencies, 680-sample duration, 1200-sample nominal mark lead-in at 8 kHz, 1200 bits/s, symbol polarity, framing and the recovered bytes. Check that a CID seizure is absent. Record detector tolerances and test with metered clipping and noise. |
+| T04 | TEL-02, EMU-02 | Drive single-frame `D1`, `D0`, `D2`, late, truncated and lost replies across the media-drain boundary. Accept only the valid count, retry once on failure and avoid duplicate transitions. |
+| T05 | TEL-01, EMU-01 | Register or directly authenticate through the lab route, answer, exchange bidirectional PCMU and release. Receive each digit `0` through `9`, `*`, `#`, and `A` through `D` exactly once. Reject an unadmitted route. Test any claimed RFC 4733 profile separately. |
+| T06 | TEL-01, TEL-02, EMU-01 | Run the `LAB` scenario through actual SIP/RTP. Observe CAS, A, connect, FSK, D1, exact screen, `Go` returning `1`, response screen, disconnect and working voice before hangup. One application transition occurs. |
+| T07 | TEL-02, EMU-01 | Withhold capability or return `D`. Start the equivalent keypad voice flow within the project threshold. Check that a late ADSI digit cannot choose a voice menu item. |
+| T08 | TEL-01, TEL-02, EMU-02 | Hang up at alert, mid-spill, during reply, during app input and during provider work. Inject queue overflow, WS disconnect and duplicate call events. Each case releases the call resources within the clean teardown target or records the fault-path bound, and leaves no work or input assigned to the next call. |
+| T09 | TEL-02, EMU-02 | Decode native Asterisk SDC with the standalone terminal and compare equivalent application output against it. Test a seeded loss and jitter sweep, including a dropped spill packet. Confirm either validated delivery or bounded fallback. Retain documented failure settings. |
+| T10 | APP-01 | Edit and publish the current draft with a route, race two editors, attempt a stale publish, and roll back. Exactly one draft generation wins, and in-flight calls see only their pinned revision. Archive with and without route disposition and verify restoration leaves routes disabled. |
+| T11 | APP-01, APP-03 | Import the graph fixture, export it and import into a fresh app. Preserve graph semantics. Reject wrong schema version, duplicate IDs or digits, broken edges, unreachable/unending nodes, automatic cycles and prohibited fields before publish. |
+| T12 | APP-02, APP-03 | Compose a flow in the graph and keyboard views. Preview character substitution, layout limits and page keys. Simulation and a new live SIP fixture call produce the same navigation and outcomes on the same profile. |
+| T13 | APP-02, FIN-02 | Simulate a provider error and hangup inside a draft. Trace position and outcome. Observe zero live provider, telephony or financial access and no secret fields in the session result. |
+| T14 | APP-01, FIN-02 | Exercise API permissions by role and ownership, CSRF defenses and draft preconditions. Audit publish and route outcomes without persisting payloads or sensitive inputs. |
+| T15 | APP-03, EMU-01 | Draw the same viewport and active softkey map in the standalone graphical UI and headless result. Check invalid-input and session-limit handling, concurrent calls, and navigation parity with voice. |
+| T16 | DATA-01 | Resolve a valid fixture NPA-NXX, confirm its suggested site and override it. Withheld, unsupported and ambiguous assignments lead to manual choice. Confirm that the full input identity is absent from provider requests and caches. |
+| T17 | DATA-02 | Load weather examples including absent current conditions, a time-zone boundary and an expired alert. Assert source time, units, fresh/stale/unavailable labels and validated fallback. |
+| T18 | DATA-02 | Test headlines and quotes with correct attribution, missed refresh, delayed and end-of-day market labels, and malformed contents. Assert that each demo label appears and that quote age uses quote time. |
+| T19 | DATA-02 | Load a draw including bonus data and a later correction. Compare example caller numbers only to the requested game and draw. Expose official verification guidance, remove older corrected data from current results and keep demo or manual provenance visible. |
+| T20 | TEL-02, TEL-03 | For each physical target independently, run ten consecutive clean SDC calls and one test with the capability reply withheld or unavailable CPE substituted. Check actual display, all claimed keys, mode recovery and usable voice. Mark qualification with exact scope and capture links. |
+| T21 | TEL-04, EMU-02 | Verify application acceptance following the link acknowledgment, complete record order, disconnect, run of resident feature after hangup and durable state after emulator restart. Refusal and mid-update abort preserve the old feature. Run a duplicate commit and verify idempotence. |
+| T22 | TEL-03, TEL-04 | On a disposable supported physical slot, establish original contents, install a new feature, verify post-hangup behavior, power cycle and abort an update. Record the observed persistence separately for each hardware profile. |
+| T23 | TEL-03, TEL-04 | If a graphics profile is proposed, verify an observed frame layout using an original small monochrome pattern. Check the displayed pattern and text recovery. Mark unavailable where no verified encoding/profile exists. |
+| T24 | FIN-01, FIN-02 | Claim a Bridge demo token and read only balances for enrolled selections. Check response codes, provider faults, decimal sign, currency, balance time, optional available balance and stale data. Deny unexpected accounts and validate the claim and access endpoint policies. |
+| T25 | FIN-01, FIN-02 | Demonstrate that a candidate found by caller ID alone gets no balance. Exercise confirmed code, wrong/expired/replayed code, concurrent verification, revoked identity, ambiguous caller and unenrolled route. Exactly one valid exchange authorizes one eligible call. |
+| T26 | FIN-02 | End a private flow via exit, idle timeout, hangup and mid-response revocation. Verify clears, zero residual test balances or access digits in generated telemetry and absence of the data from simulator, exports, public flows and model requests. Check retention after a disconnected handset. |
+| T27 | FIN-01, FIN-02 | Conduct a separate consented deployment pilot. Confirm institution availability, unlink and provider revocation, scope to selected accounts and private route/profile qualification before live activation. |
+| T28 | AI-01 | Call with valid curated questions, unavailable evidence, timeout, malformed model output and unapproved injected instructions in excerpts. Return one bounded, attributed response or fallback. Inspect adapter inputs for absence of sensitive context. |
+| T29 | OPS-01 | Provision from a fresh Compose checkout, verify health gates, make a live lab SIP call and confirm app and database restart preserve configuration. Inspect published interfaces and secret mount permissions. |
+| T30 | OPS-01 | Run 100 clean calls including a sustained 10-call concurrency interval. Use nearest-rank p95 for the sampled response times. Check the capacity, excess-call and cleanup targets, then restore an encrypted backup in isolation and measure both recovery targets. |
+| T31 | OPS-02 | Demonstrate checks on a normal and an untrusted PR. Verify release digest, SBOM, attestation and qualifying test report in the independent repo. Confirm required checks prevent a failed release commit from promotion. |
+| T32 | OPS-01, OPS-02 | Promote a digest to staging, run a SIP smoke call, induce a failed canary in the exercise, restore the prior usable release and check smoke again. Verify policy and traceability for production promotion. |
+
+## Physical qualification record
+
+| Target | SDC | FDM | Graphics |
+| --- | --- | --- | --- |
+| Standalone emulator | Planned | Planned | Capability-specific |
+| Nortel Vista 350 | Pending hardware | Pending hardware | Out of initial scope |
+| ADSI-capable Millennium | Pending hardware | Capability-specific | Pending evidence |
+
+Each completed row identifies target and profile versions, adapter and settings, exact commit and test ID, relevant audio offsets, decoded messages, return digits, visible display and voice behavior. Keep raw captures local. Publish short sanitized summaries and distinguish fixture success, observed hardware behavior and unsupported or untested features.

@@ -28,6 +28,19 @@ Provider adapters return a validated result with `status` (`fresh`, `stale` or `
 
 Use periodic refresh and request coalescing. Keep provider limits, redistribution rights, supported markets/games, source fields and expected update schedule in provider configuration. Normalize content before display, cap size and reject malformed inputs. Use a fixed public message when a source is unavailable. Demo data is labeled on every affected screen and voice response.
 
+### Graph adapter arguments
+
+Each operation takes only the fields listed here. Resolve catalogue identifiers server-side before making a lookup. Use projection fields chosen by the operation for graph interpolation. Structured lists are rendered by typed InfoLine components.
+
+| Operation | Arguments and result fields |
+| --- | --- |
+| `weather.current` | Required `site`. Return `place`, `temperatureText`, `localTime` and `displayTitle` for interpolation. Attach structured warning data where present. |
+| `weather.forecast` | Required `site`. Return the place and forecast periods with start/end instants and concise text. |
+| `news.headlines` | Required `topic`. Return headline items with publisher and publication time, with optional approved summaries. |
+| `market.quote` | Required `instrument`, a configured exchange-symbol identifier. Return exchange, symbol, price text, currency and delay category alongside the source timestamp. |
+| `lottery.draw` | Required `game`, optionally `draw_date` as an ISO calendar date. The game binding selects the operator and region. Return the operator, draw date, zone, ordered numbers and named bonus fields. |
+| `assistant.answer` | Required `question`, a curated question identifier. Return answer text and source labels. |
+
 ## SimpleFIN balance service
 
 The web-enrolled user connects an account in SimpleFIN Bridge, submits a one-time Setup Token through the authenticated enrollment page and chooses which account aliases may be presented. Claim the token server-side once. Validate both the returned Access URL and the decoded claim URL against configured HTTPS Bridge hosts and path roles. Use explicit TLS verification, fixed egress policy and disabled redirects. Keep access credentials in encrypted storage with a separately managed key. Offer token revocation and re-enrollment. A lost claim response requires a new token where claim success cannot be established. Limit request frequency to the configured provider budget and coalesce overlapping reads. [SimpleFIN protocol and Bridge](../sources.md#s9-simplefin)

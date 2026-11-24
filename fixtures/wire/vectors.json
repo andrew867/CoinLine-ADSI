@@ -1,0 +1,83 @@
+{
+  "origin": "Synthetic vectors derived from the Asterisk 22 encoder layouts. Hex starts at outer type.",
+  "valid": [
+    {
+      "id": "sdc-connect",
+      "hex": "84 05 01 8E 00 86 00 62",
+      "parameterLengths": [
+        0,
+        0
+      ],
+      "result": "Open an unnamed display session and request data mode."
+    },
+    {
+      "id": "sdc-lab",
+      "hex": "84 0D 01 82 07 01 40 FF 4C 41 42 FF 83 01 01 52",
+      "parameterLengths": [
+        7,
+        1
+      ],
+      "result": "Display LAB on information-page line 1."
+    },
+    {
+      "id": "sdc-lab-with-key",
+      "hex": "84 1F 01 82 07 01 40 FF 4C 41 42 FF 83 01 01 80 08 10 47 6F FF 47 6F FF 31 81 06 10 01 01 01 01 01 71",
+      "parameterLengths": [
+        7,
+        1,
+        8,
+        6
+      ],
+      "result": "Display LAB and map the Go key in slot 1 to DTMF 1."
+    },
+    {
+      "id": "sdc-ok",
+      "hex": "84 0E 01 88 00 82 06 01 40 FF 4F 4B FF 83 01 01 FF",
+      "parameterLengths": [
+        0,
+        6,
+        1
+      ],
+      "result": "Clear temporary keys and display OK on information-page line 1."
+    },
+    {
+      "id": "sdc-release",
+      "hex": "84 06 01 85 00 87 01 00 68",
+      "parameterLengths": [
+        0,
+        1
+      ],
+      "result": "Disconnect the display session and return to voice mode."
+    },
+    {
+      "id": "fdm-disconnect",
+      "hex": "85 03 01 84 00 F3",
+      "parameterLengths": [
+        0
+      ],
+      "result": "End a staged feature download independently of SDC release."
+    }
+  ],
+  "invalid": [
+    {
+      "id": "bad-checksum",
+      "hex": "84 0D 01 82 07 01 40 FF 4C 41 42 FF 83 01 01 53",
+      "reject": "checksum"
+    },
+    {
+      "id": "bad-frame-length",
+      "hex": "84 0C 01 82 07 01 40 FF 4C 41 42 FF 83 01 01 52",
+      "reject": "length"
+    },
+    {
+      "id": "truncated-parameter",
+      "hex": "84 0D 01 82 07 01 40 FF 4C 41 42 FF 83 02 01 51",
+      "reject": "parameter-length"
+    },
+    {
+      "id": "unknown-display-tag",
+      "hex": "84 0D 01 82 07 01 40 FF 4C 41 42 FF FE 01 01 D7",
+      "reject": "unsupported-tag"
+    }
+  ]
+}

@@ -10,6 +10,10 @@ CoinLine ADSI is a planned server for analog display telephones. The demo, **Coi
 | [ADSI interoperability](docs/spec/adsi-protocol.md) | Media profiles, wire formats, SDC, FDM and handset evidence |
 | [Application platform](docs/spec/application-platform.md) | Call flow, graph editor, versioning, API and emulator contracts |
 | [Data and access](docs/spec/data-and-access.md) | InfoLine screens, feeds, location selection, SimpleFIN and the information assistant |
+| [Verification plan](docs/test/verification.md) | Test cases, required evidence and requirements traceability |
+| [Phased development plan](docs/plan/development.md) | Tranches, first implementation tasks and acceptance gates |
+| [Packaging and delivery](docs/plan/operations.md) | Compose topology, operations, repository split and GitHub Actions |
+| [Fixtures](fixtures/README.md) | Synthetic wire vectors, application graph and provider examples |
 | [Sources](docs/sources.md) | Primary references, implementation evidence and unresolved questions |
 
 The initial implementation target is one incoming SIP call that sends a live screen, handles one softkey and returns the terminal to voice. The initial physical target is a Nortel Vista 350. An ADSI-capable Millennium is a separate compatibility target. Each target earns its own supported status through a recorded test result.

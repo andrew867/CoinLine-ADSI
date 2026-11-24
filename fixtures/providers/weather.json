@@ -1,0 +1,41 @@
+{
+  "testClock": "2026-02-07T15:00:00Z",
+  "timeZone": "America/St_Johns",
+  "requestedSite": "demo-harbour",
+  "operation": "weather.current",
+  "responses": [
+    {
+      "status": "fresh",
+      "mode": "demo",
+      "source": "Fixture Weather",
+      "dataTime": "2026-02-07T14:30:00Z",
+      "fetchedAt": "2026-02-07T14:40:00Z",
+      "value": {
+        "displayTitle": "DEMO WEATHER",
+        "place": "Demo Harbour",
+        "temperatureText": "-4 C",
+        "localTime": "11:00 NST"
+      }
+    },
+    {
+      "status": "stale",
+      "mode": "demo",
+      "source": "Fixture Weather",
+      "dataTime": "2026-02-07T12:00:00Z",
+      "fetchedAt": "2026-02-07T12:10:00Z",
+      "value": {
+        "displayTitle": "STALE DEMO WX",
+        "place": "Demo Harbour",
+        "temperatureText": "-6 C",
+        "localTime": "08:30 NST"
+      }
+    },
+    {
+      "status": "unavailable",
+      "mode": "demo",
+      "source": "Fixture Weather",
+      "dataTime": null,
+      "fetchedAt": "2026-02-07T14:58:00Z"
+    }
+  ]
+}

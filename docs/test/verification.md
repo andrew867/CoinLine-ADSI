@@ -15,7 +15,7 @@ Use deterministic clocks and independent intended results. Run unit tests on inp
 
 ## Cases and pass criteria
 
-These cases are planned. The [fixture manifest](../../fixtures/README.md) describes currently checked-in inputs.
+These cases define release acceptance. The [fixture manifest](../../fixtures/README.md) describes the checked-in inputs. See the [local lab results](../status/local-lab.md) for measured software evidence and open qualification.
 
 Run the design preflight from the project root with Python 3.11 or later and the JSON Schema validator. On Windows, use the MSYS2 MINGW64 shell.
 
@@ -71,7 +71,7 @@ Record the injection schedule, spill boundaries, observed digit timing, acknowle
 
 | Target | SDC | FDM | Graphics |
 | --- | --- | --- | --- |
-| Standalone emulator | Planned | Planned | Capability-specific |
+| Standalone emulator | Verified PCMU with in-band DTMF | Verified disposable slot | Capability-specific |
 | Nortel Vista 350 | Pending hardware | Pending hardware | Out of initial scope |
 | ADSI-capable Millennium | Pending hardware | Capability-specific | Pending evidence |
 

@@ -1,0 +1,37 @@
+name: Promote images
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        options: [staging, production]
+        required: true
+      release_tag:
+        description: Qualified release tag
+        required: true
+permissions:
+  contents: read
+  packages: read
+concurrency:
+  group: coinline-adsi-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment: ${{ inputs.environment }}
+    runs-on: [self-hosted, linux, coinline-adsi-deploy]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Promote and verify
+        env:
+          ADSI_RELEASE_TAG: ${{ inputs.release_tag }}
+          ADSI_ENV_FILE: ${{ vars.ADSI_ENV_FILE }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          [[ "$ADSI_RELEASE_TAG" =~ ^v[0-9][a-zA-Z0-9._-]*$ ]]
+          manifest="$(gh release download "$ADSI_RELEASE_TAG" --pattern coinline-release.json --output -)"
+          export ADSI_APP_DIGEST="$(jq -er '.app' <<< "$manifest")"
+          export ADSI_GATEWAY_DIGEST="$(jq -er '.gateway' <<< "$manifest")"
+          namespace="ghcr.io/$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          sh deploy/promote.sh "$namespace"

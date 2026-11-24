@@ -1,0 +1,29 @@
+name: Publish images
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate release source
+        run: |
+          git ls-files --error-unmatch LICENSE >/dev/null
+          python -m pip install -r service/requirements.txt
+          python tests/check_design.py
+          PYTHONPATH=service python -m unittest discover -s tests
+          python deploy/init_lab.py
+      - name: Build, qualify and publish attested digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash deploy/release.sh

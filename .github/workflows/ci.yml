@@ -1,0 +1,57 @@
+name: Verify
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "31 5 * * 2"
+  workflow_dispatch:
+permissions:
+  contents: read
+
+jobs:
+  verification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate source and fixtures
+        run: |
+          python -m pip install -r service/requirements.txt
+          python tests/check_design.py
+          PYTHONPATH=service python -m unittest discover -s tests -v
+          g++ -std=c++20 -Wall -Wextra -Werror -I terminal-emu tests/terminal_vectors.cpp terminal-emu/terminal.cpp -o /tmp/terminal-vectors
+          /tmp/terminal-vectors
+          git diff --check
+      - name: Build local lab
+        run: |
+          python deploy/init_lab.py
+          docker compose --profile verify build
+          docker compose --profile verify up -d --no-build --wait gateway app reference
+      - name: Verify module inventories and SIP calls
+        run: |
+          sh tests/check-modules.sh
+          PYTHONPATH=service python tests/check_pcm.py
+          sh tests/smoke.sh
+          python tests/check_admission.py
+          python tests/live_dtmf.py
+          python tests/live_api.py
+          python tests/live_sip_app.py
+          python tests/live_balance_demo.py
+      - name: Verify the operator console in Chromium
+        working-directory: web
+        run: |
+          npm ci
+          npm audit --audit-level=high
+          npx playwright install --with-deps chromium
+          npx playwright test
+      - name: Exercise capacity and resident persistence
+        if: github.event_name == 'schedule'
+        run: |
+          python tests/load_lab.py
+          python tests/live_capacity.py
+          ADSI_FDM_ENABLE=1 docker compose up -d --no-deps --wait app
+          python tests/live_resident.py
+      - name: Show service state after failure
+        if: failure()
+        run: docker compose --profile verify ps -a

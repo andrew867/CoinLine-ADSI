@@ -284,6 +284,12 @@ async def routes(store=Depends(database)):
     return await store.routes()
 
 
+@api.get("/telephony/status")
+async def telephony_status(request: Request):
+    gateway = request.app.state.gateway
+    return gateway.status() if gateway else {"ready": False, "active": 0}
+
+
 @api.get("/profiles")
 async def profiles():
     return [

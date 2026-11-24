@@ -1,10 +1,12 @@
 import json
 import unittest
-from unittest.mock import patch
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock, patch
 
 import httpx
+from defusedxml import ElementTree
 
-from coinline_adsi import fdm, livefeeds
+from coinline_adsi import fdm, livefeeds, providers
 from coinline_adsi.assistant import InformationDesk
 
 
@@ -23,6 +25,70 @@ class ResidentArtifactTests(unittest.TestCase):
 
 
 class PublicProviderTests(unittest.IsolatedAsyncioTestCase):
+    async def test_location_confirms_or_overrides_numbering_suggestion(self):
+        places = {
+            "east": {**providers.DEMO_SITE, "place": "East Harbour"},
+            "west": {**providers.DEMO_SITE, "place": "West Harbour"},
+        }
+        config = {"sites": places, "prefixes": {"709555": "east"}}
+        for caller, digits, expected in (
+            ("+17095550123", ["1"], "east"),
+            ("+17095550123", ["2", "2"], "west"),
+            (None, ["2"], "west"),
+        ):
+            with self.subTest(caller=caller is not None, digits=digits):
+                link = AsyncMock()
+                link.data_mode = True
+                link.selection.side_effect = digits
+                self.assertEqual(await providers.choose_site(config, caller, link, AsyncMock()), expected)
+                self.assertEqual(link.transfer.await_count, len(digits))
+
+    async def test_live_weather_uses_source_time_and_checks_current_conditions(self):
+        source_time = datetime(2026, 2, 8, 2, 30, tzinfo=UTC)
+        site = {**providers.DEMO_SITE, "code": "s1234567"}
+        document = ElementTree.fromstring(
+            '<siteData><currentConditions><dateTime name="observation" zone="UTC">'
+            '<timeStamp>20260208023000</timeStamp></dateTime>'
+            '<temperature>-8</temperature></currentConditions></siteData>')
+        desk = providers.Providers()
+        self.addAsyncCleanup(desk.client.aclose)
+        with patch.object(desk, "_weather", new_callable=AsyncMock, return_value=document) as fetch:
+            with patch.object(providers, "datetime", wraps=datetime) as clock:
+                clock.now.return_value = source_time + timedelta(hours=3)
+                result = await desk._weather_result("weather.current", site)
+                self.assertEqual(result["displayTitle"], "STALE ECCC WEATHER")
+                self.assertEqual(result["localTime"], "23:00 NST")
+                clock.now.return_value = source_time + timedelta(hours=7)
+                self.assertIsNone(await desk._weather_result("weather.current", site))
+                fetch.return_value = ElementTree.fromstring("<siteData/>")
+                self.assertIsNone(await desk._weather_result("weather.current", site))
+
+    async def test_manual_market_age_and_draw_correction(self):
+        date = datetime(2026, 2, 8, 2, 30, tzinfo=UTC)
+        quote = {**providers.fixture("market.quote", {}), "delay": "Delayed", "dataTime": date.isoformat()}
+        quote.pop("displayTitle")
+        draw = {**providers.fixture("lottery.draw", {}), "dataTime": date.isoformat()}
+        draw.pop("displayTitle")
+        desk = providers.Providers()
+        self.addAsyncCleanup(desk.client.aclose)
+        config = {"manual": {"market.quote": {"TSX-DEMO": quote}, "lottery.draw": {"atlantic-demo": draw}}}
+        with patch.object(providers, "datetime", wraps=datetime) as clock:
+            clock.now.return_value = date + timedelta(hours=2)
+            result = await desk.lookup(config, "market.quote", {"instrument": "TSX-DEMO"})
+            self.assertEqual(result["displayTitle"], "STALE MANUAL")
+            self.assertEqual(result["delay"], "Delayed")
+            quote["delay"] = "End of day"
+            result = await desk.lookup(config, "market.quote", {"instrument": "TSX-DEMO"})
+            self.assertEqual(result["displayTitle"], "MANUAL")
+            self.assertEqual(result["delay"], "End of day")
+            result = await desk.lookup(config, "lottery.draw", {"game": "atlantic-demo"})
+            self.assertEqual(result["bonus"], "Bonus 08")
+            draw["bonus"] = "Bonus 09"
+            corrected = await desk.lookup(config, "lottery.draw", {"game": "atlantic-demo"})
+            self.assertEqual(corrected["displayTitle"], "MANUAL DRAW")
+            self.assertEqual(corrected["bonus"], "Bonus 09")
+            self.assertIsNone(await desk.lookup(config, "lottery.draw", {"game": "other-game"}))
+
     async def test_publisher_feed_parsing(self):
         response = b"<rss><channel><title>Fixture Desk</title><item><title>Later headline</title>" \
                    b"<pubDate>Sat, 7 Feb 2026 15:00:00 +0000</pubDate></item><item><title>Earlier</title>" \

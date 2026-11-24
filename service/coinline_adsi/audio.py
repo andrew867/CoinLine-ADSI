@@ -31,6 +31,8 @@ def bell202(data: bytes) -> bytes:
     bits = [1] * 180
     for byte in data:
         bits.extend((0, *((byte >> bit) & 1 for bit in range(8)), 1))
+    # Let receiver filters settle before the paced media channel drops carrier.
+    bits.extend([1] * 12)
     phase = 0.0
     samples = []
     for sample in range((len(bits) * RATE + 1199) // 1200):

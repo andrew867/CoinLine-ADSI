@@ -5,6 +5,8 @@ import base64
 import hmac
 import json
 import logging
+import math
+from collections import Counter, deque
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
@@ -21,6 +23,7 @@ from .link import Link, LinkFailure
 
 LOG = logging.getLogger(__name__)
 APP = "coinline"
+MEDIA_FRAME_BYTES = 320
 
 
 class Media:
@@ -35,6 +38,7 @@ class Media:
         correlator = uuid4().hex
         completion = loop.create_future()
         self.mark = (correlator, completion)
+        pcm += bytes(-len(pcm) % MEDIA_FRAME_BYTES)
         try:
             async with asyncio.timeout(len(pcm) / (2 * audio.RATE) + 2):
                 await self.socket.send_json({"command": "START_MEDIA_BUFFERING"})
@@ -86,6 +90,15 @@ class Gateway:
         self.connected = False
         self.calls: dict[str, Admission] = {}
         self.pending: dict[str, Admission] = {}
+        self.outcomes = Counter()
+        self.latencies = deque(maxlen=256)
+
+    def status(self):
+        samples = sorted(list(self.latencies)[-100:])
+        percentile = samples[math.ceil(len(samples) * .95) - 1] if samples else None
+        return {"ready": self.connected, "active": len(self.calls), "outcomes": self.outcomes,
+                "response_samples": len(samples),
+                "p95_dispatch_seconds": round(percentile, 4) if percentile is not None else None}
 
     async def _request(self, method: str, url: str, **parameters):
         response = await self.http.request(method, url, params=parameters)
@@ -122,12 +135,14 @@ class Gateway:
             if identifier in self.calls:
                 return
             if len(self.calls) >= self.limit:
+                self.outcomes["busy"] += 1
                 with suppress(httpx.HTTPError):
                     await self._request("DELETE", f"channels/{identifier}", reason="busy")
                 return
             loop = asyncio.get_running_loop()
             call = Admission(identifier, uuid4().hex, uuid4().hex, loop.create_future())
             self.calls[identifier] = self.pending[call.media_id] = call
+            self.outcomes["admitted"] += 1
             caller = channel.get("caller", {}).get("number")
             call.task = asyncio.create_task(self._serve_call(call, event["args"][0], caller))
         elif kind in ("StasisEnd", "ChannelDestroyed"):
@@ -143,10 +158,13 @@ class Gateway:
                     call.task.cancel()
 
     async def _serve_call(self, call: Admission, route: str, caller: str | None) -> None:
+        stage = "answer"
         try:
             async with asyncio.timeout(5):
                 await self._request("POST", f"channels/{call.channel_id}/answer")
+                stage = "bridge"
                 await self._request("POST", "bridges", bridgeId=call.bridge_id, type="mixing,proxy_media,dtmf_events")
+                stage = "media"
                 await self._request("POST", "channels/externalMedia", app=APP, channelId=call.media_id,
                                     external_host="coinline_media", transport="websocket", encapsulation="none",
                                     format="slin", transport_data="f(json)")
@@ -155,20 +173,29 @@ class Gateway:
                                     channel=f"{call.channel_id},{call.media_id}")
             # Let the newly bridged RTP leg start delivering media before CAS.
             await asyncio.sleep(0.25)
-            call.link = Link(media.play)
+            stage = "application"
+            call.link = Link(media.play, observe=self.latencies.append if route == "lab" else None)
 
             async def say(text):
-                await media.play(await audio.speech(text))
+                pcm = await audio.speech(text)
+                call.link.response_begin()
+                await media.play(pcm)
 
             async with asyncio.timeout(15 * 60):
                 await self.handler(route, caller, call.link, say)
         except (httpx.HTTPError, TimeoutError, RuntimeError, WebSocketDisconnect, OSError) as error:
-            LOG.info("call ended (%s)", type(error).__name__)
+            self.outcomes["failed"] += 1
+            self.outcomes[f"{stage}_{type(error).__name__}"] += 1
+            LOG.info("call ended at %s (%s)", stage, type(error).__name__)
             if isinstance(error, LinkFailure) and call.link and not call.link.uncertain:
                 with suppress(LinkFailure, TimeoutError, RuntimeError, WebSocketDisconnect):
                     async with asyncio.timeout(2):
                         await call.link.release()
+        except asyncio.CancelledError:
+            self.outcomes[f"{stage}_cancelled"] += 1
+            raise
         finally:
+            self.outcomes["closed"] += 1
             self.calls.pop(call.channel_id, None)
             self.pending.pop(call.media_id, None)
             await asyncio.gather(*(self._delete(path) for path in (
@@ -189,7 +216,8 @@ class Gateway:
         try:
             async with asyncio.timeout(2):
                 start = await socket.receive_json()
-            if not (start.get("event") == "MEDIA_START" and start.get("format") == "slin"):
+            if not (start.get("event") == "MEDIA_START" and start.get("format") == "slin"
+                    and start.get("optimal_frame_size") == MEDIA_FRAME_BYTES):
                 await socket.close(code=1003)
                 return
             call = self.pending.get(start.get("channel_id"))

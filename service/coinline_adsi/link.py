@@ -21,13 +21,16 @@ class LinkFailure(RuntimeError):
 
 
 class Link:
-    def __init__(self, play: Play, *, reply_timeout: float = 1.0, probe_timeout: float = 0.5):
+    def __init__(self, play: Play, *, reply_timeout: float = 1.0, probe_timeout: float = 0.5,
+                 observe: Callable[[float], None] | None = None):
         self._play = play
         self._reply_timeout = reply_timeout
         self._probe_timeout = probe_timeout
         self._digits: asyncio.Queue[Digit] = asyncio.Queue(maxsize=64)
         self._input_since: float | None = None
         self._last_ack = 0.0
+        self._selected: float | None = None
+        self._observe = observe
         self.data_mode = False
         self.uncertain = False
 
@@ -77,6 +80,7 @@ class Link:
             raise LinkFailure("prior acknowledgment is unresolved")
         self._input_since = None
         pcm = audio.bell202(data)
+        self.response_begin()
         if not await self._acknowledged(pcm):
             # The default profile has no proven bound on an old D1. A retry
             # can confirm these bytes, but cannot authorize a different frame.
@@ -102,6 +106,11 @@ class Link:
         self._discard_input()
         self._input_since = asyncio.get_running_loop().time()
 
+    def response_begin(self) -> None:
+        if self._selected is not None and self._observe is not None:
+            self._observe(max(0.0, asyncio.get_running_loop().time() - self._selected))
+        self._selected = None
+
     async def selection(self, timeout: float = 60) -> str:
         if self._input_since is None:
             raise LinkFailure("application input is disarmed")
@@ -115,6 +124,7 @@ class Link:
                     prefix_time = digit.time
                 elif len(digit.value) == 1 and digit.value in "0123456789*#":
                     if digit.time - prefix_time > self._reply_timeout:
+                        self._selected = digit.time
                         return digit.value
                     prefix_time = -1.0
 

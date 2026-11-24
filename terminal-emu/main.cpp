@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 #include <poll.h>
+#include <unistd.h>
 
 #include "terminal.hpp"
 
@@ -87,7 +88,9 @@ public:
     Json report()
     {
         std::lock_guard lock(mutex_);
-        bool exchange = alert_ && lab_ && terminal_.released() && (scenario_ == "reference" || (keySent_ && ok_ && voiceHeard_));
+        const bool displayExchange = alert_ && lab_ && terminal_.released();
+        bool exchange = displayExchange && (scenario_ == "pcm" || (voiceHeard_ &&
+            (scenario_ == "reference" || (keySent_ && ok_))));
         if (scenario_ == "fallback") {
             exchange = voiceHeard_;
         } else if (scenario_ == "fdm") {
@@ -103,11 +106,11 @@ public:
     {
         std::lock_guard lock(mutex_);
         if (input.size() == 1 && std::string("0123456789*#").find(input[0]) != std::string::npos) {
-            digit(input[0]);
+            digit(input[0], false);
         } else if (input.size() == 2 && input[0] == 'k' && input[1] >= '1' && input[1] <= '6') {
             const auto selected = terminal_.key(input[1] - '1');
             if (selected.digit) {
-                digit(selected.digit);
+                digit(selected.digit, false);
             }
         }
     }
@@ -129,7 +132,7 @@ private:
         output_.insert(output_.end(), milliseconds * (rate / 1000), 0);
     }
 
-    void digit(char symbol)
+    void digit(char symbol, bool trace = true)
     {
         const std::string digits = "123A456B789C*0#D";
         const auto slot = digits.find(symbol);
@@ -138,13 +141,16 @@ private:
         if (slot == std::string::npos) {
             return;
         }
-        for (int sample = 0; sample < 70 * (rate / 1000); ++sample) {
+        const int duration = trace ? 70 : 110;
+        for (int sample = 0; sample < duration * (rate / 1000); ++sample) {
             output_.push_back(static_cast<int16_t>(4800 * (
                 std::sin(tau * rows[slot / 4] * sample / rate) +
                 std::sin(tau * columns[slot % 4] * sample / rate))));
         }
-        silence(65);
-        record({{"digit", std::string(1, symbol)}});
+        silence(trace ? 65 : 100);
+        if (trace) {
+            record({{"digit", std::string(1, symbol)}});
+        }
     }
 
     void receiveWindow()
@@ -169,7 +175,7 @@ private:
         auto cas = energy > 160 * 300.0 * 300.0 &&
             tonePower(window_, 2130) > threshold && tonePower(window_, 2750) > threshold;
         casWindows_ = cas ? casWindows_ + 1 : 0;
-        if (casWindows_ == 3) {
+        if (casWindows_ == 3 && !alert_) {
             alert_ = true;
             record({{"signal", "CAS"}});
             if (scenario_ != "fallback") {
@@ -287,6 +293,11 @@ class Call : public pj::Call {
 public:
     Call(pj::Account &account, AudioPort &port) : pj::Call(account), port_(port) {}
 
+    void onCallState(pj::OnCallStateParam &) override
+    {
+        lastStatus = getInfo().lastStatusCode;
+    }
+
     void onCallMediaState(pj::OnCallMediaStateParam &) override
     {
         const auto info = getInfo();
@@ -299,6 +310,8 @@ public:
             }
         }
     }
+
+    int lastStatus = 0;
 
 private:
     AudioPort &port_;
@@ -317,7 +330,7 @@ int main(int argc, char **argv)
         endpoint.libInit(options);
         Json result;
         {
-            AudioPort port(std::string(argv[1]) == "pcm" ? "reference" : "fdm", false);
+            AudioPort port(std::string(argv[1]) == "pcm" ? "pcm" : "fdm", false);
             std::array<char, 320> buffer;
             while (std::cin.read(buffer.data(), buffer.size()) || std::cin.gcount()) {
                 pj::MediaFrame frame;
@@ -367,6 +380,10 @@ int main(int argc, char **argv)
         options.medConfig.clockRate = rate;
         options.medConfig.sndClockRate = rate;
         options.medConfig.noVad = true;
+        options.medConfig.jbInit = 100;
+        options.medConfig.jbMinPre = 100;
+        options.medConfig.jbMaxPre = 100;
+        options.medConfig.jbDiscardAlgo = PJMEDIA_JB_DISCARD_NONE;
         endpoint.libInit(options);
         pj::TransportConfig transport;
         transport.port = 0;
@@ -380,6 +397,7 @@ int main(int argc, char **argv)
         {
             pj::AccountConfig config;
             config.idUri = "sip:lab@" + host;
+            config.mediaConfig.transportConfig.port = 0;
             config.sipConfig.authCreds.emplace_back("digest", "*", "lab", 0, password);
             pj::Account account;
             account.create(config);
@@ -389,24 +407,42 @@ int main(int argc, char **argv)
             operation.opt.videoCount = 0;
             call.makeCall("sip:" + extension + "@" + host, operation);
             const auto limit = Clock::now() + std::chrono::seconds(scenario == "interactive" ? 900 : 16);
+            std::string pendingInput;
+            bool inputOpen = scenario == "interactive";
             while (call.isActive() && Clock::now() < limit) {
                 endpoint.libHandleEvents(20);
-                pollfd input {0, POLLIN, 0};
-                if (scenario == "interactive" && poll(&input, 1, 0) > 0 && (input.revents & POLLIN)) {
-                    std::string text;
-                    if (std::getline(std::cin, text)) {
-                        if (text == "hangup") {
-                            call.hangup(pj::CallOpParam());
-                        } else {
-                            port.press(text);
-                        }
+                pollfd input {STDIN_FILENO, POLLIN, 0};
+                if (!inputOpen || poll(&input, 1, 0) <= 0 || !(input.revents & (POLLIN | POLLHUP))) {
+                    continue;
+                }
+                char chunk[128];
+                const auto length = read(input.fd, chunk, sizeof(chunk));
+                inputOpen = length > 0;
+                if (!inputOpen) {
+                    continue;
+                }
+                pendingInput.append(chunk, length);
+                for (auto end = pendingInput.find('\n'); end != std::string::npos; end = pendingInput.find('\n')) {
+                    auto text = pendingInput.substr(0, end);
+                    pendingInput.erase(0, end + 1);
+                    if (!text.empty() && text.back() == '\r') {
+                        text.pop_back();
                     }
+                    if (text == "hangup" && call.isActive()) {
+                        call.hangup(pj::CallOpParam());
+                        break;
+                    }
+                    port.press(text);
+                }
+                if (pendingInput.size() > sizeof(chunk)) {
+                    pendingInput.clear();
                 }
             }
             const bool ended = !call.isActive();
             result = port.report();
             result["ended"] = ended;
-            result["passed"] = ended && result["passed"].get<bool>();
+            result["sip_status"] = call.lastStatus;
+            result["passed"] = ended && call.lastStatus == 200 && result["passed"].get<bool>();
             if (!ended) {
                 call.hangup(pj::CallOpParam());
             }

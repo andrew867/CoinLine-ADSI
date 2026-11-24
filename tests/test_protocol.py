@@ -34,13 +34,38 @@ class WireTests(unittest.TestCase):
     def test_pcm_durations_and_carrier(self):
         self.assertEqual(len(audio.cas()), 680 * 2)
         pcm = audio.bell202(wire.LAB)
-        self.assertEqual(len(pcm) // 2, (180 + 10 * len(wire.LAB)) * 8000 // 1200 + 1)
+        bits = 180 + 10 * len(wire.LAB) + 12
+        self.assertEqual(len(pcm) // 2, (bits * 8000 + 1199) // 1200)
         mark = [sample for (sample,) in struct.iter_unpack("<h", pcm[:2400])]
         zero_crossings = sum(left < 0 <= right for left, right in zip(mark, mark[1:]))
         self.assertAlmostEqual(zero_crossings, 180, delta=1)
 
 
 class LinkTests(unittest.IsolatedAsyncioTestCase):
+    async def test_t04_failed_ack_disarms_application(self):
+        clock = asyncio.get_running_loop().time
+        for response in ("D0", "D2", "D", "1", ""):
+            with self.subTest(response=response):
+                attempts = []
+
+                async def play(pcm):
+                    attempts.append(pcm)
+                    end = clock()
+                    # Reordered or cached tokens timestamped before media drain cannot acknowledge.
+                    for digit in "D1":
+                        link.receive(digit, end - 0.005)
+                    for digit in response:
+                        link.receive(digit, end)
+                    return end
+
+                link = Link(play, reply_timeout=0.005)
+                with self.assertRaises(LinkFailure):
+                    await link.transfer(wire.LAB, open_input=True)
+                self.assertEqual(len(attempts), 2)
+                self.assertTrue(link.uncertain)
+                with self.assertRaisesRegex(LinkFailure, "disarmed"):
+                    await link.selection(0.005)
+
     async def test_confirmed_screen(self):
         now = asyncio.get_running_loop().time
         replies = iter(("A", "D1", "D1", "D1"))

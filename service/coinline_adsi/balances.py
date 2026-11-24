@@ -48,6 +48,12 @@ class Balance:
     available: Decimal | None
     as_of: datetime
 
+    def freshness(self, now=None):
+        age = (now or datetime.now(UTC)) - self.as_of
+        if age < timedelta(0):
+            return "future"
+        return "current" if age <= timedelta(hours=48) else "stale"
+
 
 @dataclass(frozen=True)
 class Transaction:
@@ -67,7 +73,8 @@ class SimpleFIN:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
 
-    async def claim(self, token: str) -> str:
+    @staticmethod
+    def claim_url(token: str) -> str:
         if not 1 <= len(token) <= 2048:
             raise ProviderUnavailable("Invalid setup token.")
         try:
@@ -75,18 +82,28 @@ class SimpleFIN:
         except (UnicodeError, binascii.Error) as error:
             raise ProviderUnavailable("Invalid setup token.") from error
         _url(claim_url, claim=True)
+        return claim_url
+
+    async def claim(self, token: str) -> str:
+        claim_url = self.claim_url(token)
         try:
-            response = await self.client.post(claim_url, content=b"", follow_redirects=False)
+            response = await self.client.post(claim_url, content=b"", follow_redirects=False, timeout=20)
+            if response.status_code == 403:
+                raise ProviderUnavailable("Setup token rejected. Check or revoke it in SimpleFIN Bridge and generate a new token.")
             if response.status_code != 200 or len(response.content) > 2048:
-                raise ProviderUnavailable("Setup token could not be claimed.")
+                raise ProviderUnavailable("Claim result unavailable. Check or revoke the connection in SimpleFIN Bridge before starting again.")
         except httpx.HTTPError:
             # A timed-out claim can still have consumed its token.
-            raise ProviderUnavailable("Claim result unavailable. Obtain a new token.") from None
+            raise ProviderUnavailable("Claim result unavailable. Check or revoke the connection in SimpleFIN Bridge before starting again.") from None
         access_url = response.text.strip()
-        _url(access_url, claim=False)
+        try:
+            _url(access_url, claim=False)
+        except ProviderUnavailable:
+            raise ProviderUnavailable("Claim returned an unrecognized Access URL. Check the connection in SimpleFIN Bridge.") from None
         return access_url
 
-    async def balance(self, access_url: str, connection: str, account: str, now: datetime | None = None) -> Balance:
+    async def balance(self, access_url: str, connection: str, account: str, now: datetime | None = None,
+                      *, require_current: bool = True) -> Balance:
         now = now or datetime.now(UTC)
         try:
             accounts = await self.accounts(access_url, account)
@@ -98,10 +115,11 @@ class SimpleFIN:
             if not re.fullmatch(r"[A-Z]{3}", record["currency"]) or type(record["balance-date"]) is not int:
                 raise ValueError("invalid balance metadata")
             observed = datetime.fromtimestamp(record["balance-date"], UTC)
-            if not timedelta(0) <= now - observed <= timedelta(hours=48):
+            result = Balance(record["currency"], _decimal(record["balance"]),
+                             _decimal(record["available-balance"]) if record.get("available-balance") is not None else None, observed)
+            if require_current and result.freshness(now) != "current":
                 raise ProviderUnavailable("Balance unavailable.")
-            return Balance(record["currency"], _decimal(record["balance"]),
-                           _decimal(record["available-balance"]) if "available-balance" in record else None, observed)
+            return result
         except (httpx.HTTPError, KeyError, TypeError, ValueError, InvalidOperation, OverflowError, AttributeError):
             raise ProviderUnavailable("Balance unavailable.") from None
 
@@ -117,7 +135,7 @@ class SimpleFIN:
             currency = row["currency"]
             if not re.fullmatch(r"[A-Z]{3}", currency):
                 raise ValueError
-            records = row["transactions"]
+            records = row.get("transactions", [])
             if not isinstance(records, list) or len(records) > 2000:
                 raise ValueError
             result = []
@@ -143,12 +161,24 @@ class SimpleFIN:
         try:
             response = await self.client.get(f"https://{url.hostname}/simplefin/accounts",
                                              auth=(unquote(url.username), unquote(url.password)),
-                                             params=params, follow_redirects=False)
+                                             params=params, follow_redirects=False, timeout=15)
+            if response.status_code == 403:
+                raise ProviderUnavailable("SimpleFIN access was rejected or revoked. Check the connection in Bridge.")
+            if response.status_code == 402:
+                raise ProviderUnavailable("SimpleFIN reports payment is required.")
             if response.status_code != 200 or len(response.content) > 300_000:
                 raise ProviderUnavailable("Balance unavailable.")
             document = response.json()
             accounts = document["accounts"]
-            if document.get("errlist") or document.get("errors") or not isinstance(accounts, list) or len(accounts) > 128:
+            if document.get("errlist") or document.get("errors"):
+                errors = document.get("errlist") or []
+                codes = {error.get("code") for error in errors if isinstance(error, dict) and isinstance(error.get("code"), str)}
+                if "con.auth" in codes or "gen.auth" in codes:
+                    raise ProviderUnavailable("SimpleFIN reports an authentication problem. Check the connection in Bridge.")
+                if "act.missingdata" in codes or "act.failed" in codes:
+                    raise ProviderUnavailable("SimpleFIN reports incomplete or unavailable account data. Try again later.")
+                raise ProviderUnavailable("SimpleFIN reports a provider error. Check Bridge for details.")
+            if not isinstance(accounts, list) or len(accounts) > 128:
                 raise ProviderUnavailable("Balance unavailable.")
             return accounts
         except (httpx.HTTPError, ValueError, TypeError, KeyError, AttributeError):

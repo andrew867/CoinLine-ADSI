@@ -9,12 +9,14 @@
   output { display:block; font:bold 1.25rem monospace; padding:.5rem 0 }
 </style>
 <h1>Private balance</h1>
-<a href="/auth/login">Sign in</a>
+<a href="/auth/login">Sign in</a> · <a href="/">Console</a>
 <p id="status" role="status"></p>
 <section>
   <h2>Connect a SimpleFIN account</h2>
-  <form id="claim"><label>Setup Token<input id="token" type="password" autocomplete="off" required></label>
-    <button>Find accounts</button></form>
+  <form id="claim" hidden><label>Setup Token<input id="token" type="password" autocomplete="off" required></label>
+    <button>Claim token and find accounts</button></form>
+  <button id="resume" hidden>Resume saved setup</button>
+  <button id="discard" hidden>Discard pending setup</button>
   <form id="bind" hidden>
     <label>Account<select id="account"></select></label>
     <label>Display alias<input id="alias" maxlength="18" placeholder="Savings" required></label>
@@ -22,8 +24,10 @@
     <button>Link account</button>
   </form>
   <button id="unlink" hidden>Unlink account</button>
+  <button id="verify" hidden>Test read-only connection</button>
+  <output id="verification" aria-live="polite"></output>
 </section>
-<section>
+<section id="call-approval" hidden>
   <h2>Approve a call</h2>
   <form id="approval">
     <label>Challenge shown on the phone<input id="challenge" inputmode="numeric" maxlength="8" required></label>
@@ -47,24 +51,54 @@
   function error(reason) { show(reason.message); }
   async function refresh() {
     const state = await api("");
+    byId("claim").hidden = state.pending;
     byId("unlink").hidden = !state.linked;
-    show(state.linked ? "Linked account: " + state.alias : "No account linked");
+    byId("verify").hidden = !state.linked;
+    byId("resume").hidden = !state.claimed;
+    byId("discard").hidden = !state.pending;
+    byId("call-approval").hidden = state.local;
+    show(state.pending ? (state.claimed ? "Access saved. Resume account selection." : "Claim status uncertain. Check SimpleFIN Bridge before discarding.") : state.linked ? "Linked account: " + state.alias : "No account linked");
+  }
+  function selectAccounts(accounts) {
+    byId("account").replaceChildren(...accounts.map(account => new Option(account.label, account.id)));
+    byId("bind").hidden = false;
+    byId("claim").hidden = true;
+    byId("resume").hidden = true;
+    byId("discard").hidden = false;
+    show("Access saved. Choose the account to link.");
   }
   byId("claim").onsubmit = event => {
     event.preventDefault();
     const token = byId("token").value;
     byId("token").value = "";
-    api("/bank-link", "POST", {token}).then(accounts => {
-      byId("account").replaceChildren(...accounts.map(account => new Option(account.label, account.id)));
-      byId("bind").hidden = false;
-    }).catch(error);
+    byId("claim").hidden = true;
+    show("Claiming setup token…");
+    api("/bank-link", "POST", {token}).then(selectAccounts).catch(async reason => { await refresh().catch(error); error(reason); });
+  };
+  byId("resume").onclick = () => api("/resume", "POST").then(selectAccounts).catch(error);
+  byId("discard").onclick = () => {
+    if (confirm("Check or revoke the pending connection in SimpleFIN Bridge first. Discard this local setup?"))
+      api("/pending", "DELETE").then(() => { byId("bind").hidden = true; return refresh(); }).catch(error);
   };
   byId("bind").onsubmit = event => {
     event.preventDefault();
     api("", "PUT", {phone:byId("phone").value, alias:byId("alias").value, choice:byId("account").value})
       .then(() => { byId("bind").hidden = true; byId("bind").reset(); return refresh(); }).catch(error);
   };
-  byId("unlink").onclick = () => api("", "DELETE").then(refresh).catch(error);
+  byId("unlink").onclick = () => {
+    if (confirm("Unlink the locally stored connection? You can revoke the Access URL in SimpleFIN Bridge."))
+      api("", "DELETE").then(() => { byId("verification").textContent = ""; return refresh(); }).catch(error);
+  };
+  byId("verify").onclick = async () => {
+    byId("verify").disabled = true;
+    byId("verification").textContent = "Checking…";
+    try {
+      const result = await api("/verify", "POST");
+      const freshness = {current:"Current balance", stale:"Stale balance timestamp", future:"Future-dated balance timestamp"}[result.freshness];
+      byId("verification").textContent = `Connection verified · ${freshness} · ${result.currency} ${result.posted} · as of ${result.as_of} · ${result.transactions_shown} recent posted transactions`;
+    } catch (reason) { byId("verification").textContent = ""; error(reason); }
+    finally { byId("verify").disabled = false; }
+  };
   byId("approval").onsubmit = event => {
     event.preventDefault();
     byId("code").textContent = "";

@@ -1,14 +1,78 @@
 import base64
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import httpx
 
 from coinline_adsi.balances import Approvals, ProviderUnavailable, SimpleFIN
+from coinline_adsi.private import PrivateBalances
 
 
 class BalanceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_connection_inspection_preserves_phone_freshness_gate(self):
+        now = datetime(2026, 2, 7, 15, tzinfo=UTC)
+        stamp = int((now + timedelta(minutes=15)).timestamp())
+        def route(request):
+            return httpx.Response(200, json={"accounts": [{"id": "fixture-account", "conn_id": "fixture-connection",
+                "currency": "CAD", "balance": "42.17", "balance-date": stamp}]})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as client:
+            adapter = SimpleFIN(client)
+            url = "https://fixture:fixture@bridge.simplefin.org/simplefin"
+            with self.assertRaises(ProviderUnavailable):
+                await adapter.balance(url, "fixture-connection", "fixture-account", now)
+            result = await adapter.balance(url, "fixture-connection", "fixture-account", now, require_current=False)
+            self.assertEqual(result.freshness(now), "future")
+
+    async def test_claim_is_saved_before_account_lookup_and_survives_restart(self):
+        pending = {}
+        requests = []
+
+        async def query(sql, parameters):
+            if sql.startswith("INSERT INTO bank_pending"):
+                if pending:
+                    return None
+                pending.update(claim_id=parameters[1], access_sealed=None, choices_sealed=None)
+            elif sql.startswith("UPDATE bank_pending SET access_sealed"):
+                pending["access_sealed"] = parameters[0]
+            elif sql.startswith("SELECT claim_id"):
+                return pending.copy()
+            elif sql.startswith("INSERT INTO bank_reads"):
+                return {"used": 1}
+            elif sql.startswith("UPDATE bank_pending SET choices_sealed"):
+                pending["choices_sealed"] = parameters[0]
+            else:
+                self.fail("Unexpected database operation")
+            return {"claim_id": pending["claim_id"]}
+
+        store = type("TestStore", (), {})()
+        store._one = AsyncMock(side_effect=query)
+        access = "https://fixture:fixture@bridge.simplefin.org/simplefin"
+        def route(request):
+            requests.append(request.method)
+            if request.method == "POST":
+                return httpx.Response(200, text=access)
+            if requests.count("GET") == 1:
+                return httpx.Response(503)
+            return httpx.Response(200, json={"accounts": [{"id": "fixture-account", "conn_id": "fixture-connection", "name": "Fixture account"}]})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as client:
+            token = base64.b64encode(b"https://bridge.simplefin.org/simplefin/claim/demo").decode()
+            service = PrivateBalances(store, client, b"fixture-key" * 3)
+            with self.assertRaises(ProviderUnavailable):
+                await service.claim("fixture-owner", token)
+            self.assertIsNotNone(pending["access_sealed"])
+            self.assertNotIn(access.encode(), pending["access_sealed"])
+            restarted = PrivateBalances(store, client, b"fixture-key" * 3)
+            with self.assertRaisesRegex(ProviderUnavailable, "already pending"):
+                await restarted.claim("fixture-owner", token)
+            choices = await restarted.resume("fixture-owner")
+            self.assertEqual(choices[0]["label"], "Fixture account")
+            self.assertEqual(await restarted.resume("fixture-owner"), choices)
+            self.assertEqual(requests, ["POST", "GET", "GET"])
+            self.assertNotIn(b"Fixture account", pending["choices_sealed"])
+
     async def test_recent_transactions_bound_to_enrolled_account(self):
         now = datetime(2026, 2, 7, 15, tzinfo=UTC)
         def route(request):

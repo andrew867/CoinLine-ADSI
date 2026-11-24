@@ -4,6 +4,7 @@ pbx_config
 res_pjproject
 res_pjsip
 res_pjsip_authenticator_digest
+res_pjsip_caller_id
 res_pjsip_endpoint_identifier_user
 res_pjsip_pubsub
 res_pjsip_sdp_rtp

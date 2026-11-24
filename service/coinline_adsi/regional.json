@@ -1,0 +1,324 @@
+{
+  "numbering_url": "https://www.cnac.ca/data/COCodeStatus_ALL.zip",
+  "city_url": "https://weather.gc.ca/api/accesscity/en",
+  "weather_url": "https://weather.gc.ca/api/app/v3/en/Location/",
+  "news": {
+    "topstories": "https://www.cbc.ca/webfeed/rss/rss-topstories",
+    "world": "https://www.cbc.ca/webfeed/rss/rss-world",
+    "canada": "https://www.cbc.ca/webfeed/rss/rss-canada",
+    "politics": "https://www.cbc.ca/webfeed/rss/rss-politics",
+    "health": "https://www.cbc.ca/webfeed/rss/rss-health",
+    "arts": "https://www.cbc.ca/webfeed/rss/rss-arts",
+    "technology": "https://www.cbc.ca/webfeed/rss/rss-technology",
+    "sports": "https://www.cbc.ca/webfeed/rss/rss-sports",
+    "business": "https://www.cbc.ca/webfeed/rss/rss-business",
+    "global": "https://globalnews.ca/feed/",
+    "ntv": "https://ntv.ca/feed/",
+    "vocm": "https://vocm.com/feed/"
+  },
+  "regional_news": {
+    "NL": "https://www.cbc.ca/webfeed/rss/rss-canada-newfoundland",
+    "NS": "https://www.cbc.ca/webfeed/rss/rss-canada-novascotia",
+    "NB": "https://www.cbc.ca/webfeed/rss/rss-canada-newbrunswick",
+    "PE": "https://www.cbc.ca/webfeed/rss/rss-canada-pei",
+    "QC": "https://www.cbc.ca/webfeed/rss/rss-canada-montreal",
+    "ON": "https://www.cbc.ca/webfeed/rss/rss-canada-toronto",
+    "MB": "https://www.cbc.ca/webfeed/rss/rss-canada-manitoba",
+    "SK": "https://www.cbc.ca/webfeed/rss/rss-canada-saskatchewan",
+    "AB": "https://www.cbc.ca/webfeed/rss/rss-canada-calgary",
+    "BC": "https://www.cbc.ca/webfeed/rss/rss-canada-britishcolumbia",
+    "NT": "https://www.cbc.ca/webfeed/rss/rss-canada-north",
+    "YT": "https://www.cbc.ca/webfeed/rss/rss-canada-north",
+    "NU": "https://www.cbc.ca/webfeed/rss/rss-canada-north"
+  },
+  "finance_news": {
+    "endpoint": "https://api.headlinefeed.dev/api/search",
+    "topics": {
+      "financial": {"source": "marketwatch"},
+      "biotech": {"title": "biotech"}
+    }
+  },
+  "news_labels": {"global": "Global News"},
+  "stocks": {
+    "twelve": "https://api.twelvedata.com/quote",
+    "alpha": "https://www.alphavantage.co/query",
+    "alpha_currencies": {
+      "AAPL": "USD", "MSFT": "USD", "NVDA": "USD", "GOOGL": "USD", "META": "USD",
+      "JPM": "USD", "BAC": "USD", "GS": "USD", "MS": "USD", "C": "USD",
+      "XOM": "USD", "CVX": "USD", "COP": "USD", "SLB": "USD", "EOG": "USD",
+      "JNJ": "USD", "UNH": "USD", "PFE": "USD", "ABBV": "USD", "MRK": "USD"
+    },
+    "categories": {
+      "Tech": [
+        "AAPL",
+        "MSFT",
+        "NVDA",
+        "GOOGL",
+        "META"
+      ],
+      "Finance": [
+        "JPM",
+        "BAC",
+        "GS",
+        "MS",
+        "C"
+      ],
+      "Energy": [
+        "XOM",
+        "CVX",
+        "COP",
+        "SLB",
+        "EOG"
+      ],
+      "Health": [
+        "JNJ",
+        "UNH",
+        "PFE",
+        "ABBV",
+        "MRK"
+      ]
+    }
+  },
+  "lottery": {
+    "649": {
+      "label": "Lotto 6/49",
+      "days": [
+        2,
+        5
+      ],
+      "type": "alc",
+      "url": "https://www.alc.ca/services/WinningNumbersServlet",
+      "product": "Lotto649",
+      "count": 6,
+      "maximum": 49
+    },
+    "max": {
+      "label": "Lotto Max",
+      "days": [
+        1,
+        4
+      ],
+      "type": "alc",
+      "url": "https://www.alc.ca/services/WinningNumbersServlet",
+      "product": "LottoMax30",
+      "count": 7,
+      "maximum": 52
+    },
+    "daily-grand": {
+      "label": "Daily Grand",
+      "days": [
+        0,
+        3
+      ],
+      "type": "alc",
+      "url": "https://www.alc.ca/services/WinningNumbersServlet",
+      "product": "DailyGrand",
+      "count": 5,
+      "maximum": 49
+    },
+    "atlantic49": {
+      "label": "Atlantic 49",
+      "days": [
+        2,
+        5
+      ],
+      "type": "alc",
+      "url": "https://www.alc.ca/services/WinningNumbersServlet",
+      "product": "Atlantic49",
+      "count": 6,
+      "maximum": 49
+    },
+    "western649": {
+      "label": "Western 649",
+      "zone": "America/Edmonton",
+      "days": [
+        2,
+        5
+      ],
+      "type": "wclc",
+      "url": "https://www.wclc.com/winning-numbers/western-649-extra.htm",
+      "count": 6,
+      "maximum": 49
+    },
+    "western-max": {
+      "label": "Western Max",
+      "zone": "America/Edmonton",
+      "days": [1, 4],
+      "type": "wclc",
+      "url": "https://www.wclc.com/winning-numbers/western-max-extra.htm",
+      "count": 7,
+      "maximum": 50
+    },
+    "bc49": {
+      "label": "BC/49",
+      "zone": "America/Vancouver",
+      "days": [
+        2,
+        5
+      ],
+      "type": "western",
+      "url": "https://www.playnow.com/services2/lotto/draw/bc49/{date}",
+      "count": 6,
+      "maximum": 49
+    },
+    "quebec49": {
+      "label": "Quebec 49",
+      "days": [
+        2,
+        5
+      ],
+      "type": "quebec",
+      "url": "https://loteries.lotoquebec.com/loteries-endpoints/en/resultats/sommaires/noproduits",
+      "product": "214",
+      "count": 6,
+      "maximum": 49
+    },
+    "quebec-max": {
+      "label": "Quebec Max",
+      "days": [
+        1,
+        4
+      ],
+      "type": "quebec",
+      "url": "https://loteries.lotoquebec.com/loteries-endpoints/en/resultats/sommaires/noproduits",
+      "product": "228",
+      "count": 7,
+      "maximum": 52
+    },
+    "ontario": {
+      "label": "Ontario results",
+      "days": [],
+      "type": "pending",
+      "url": "https://gateway.www.olg.ca/feeds/winning-numbers"
+    },
+    "bc5050": {
+      "label": "BC 50/50",
+      "zone": "America/Vancouver",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "type": "bc5050",
+      "url": "https://www.playnow.com/services2/bc5050/draw/{date}"
+    },
+    "bc-poker": {
+      "label": "Pacific Hold'em",
+      "zone": "America/Vancouver",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "type": "bc-poker",
+      "url": "https://www.playnow.com/services2/phep/draw/{date}"
+    },
+    "territories": {
+      "label": "Territorial games",
+      "days": [],
+      "type": "pending"
+    }
+  },
+  "regional_games": {
+    "NL": [
+      "atlantic49"
+    ],
+    "NS": [
+      "atlantic49"
+    ],
+    "NB": [
+      "atlantic49"
+    ],
+    "PE": [
+      "atlantic49"
+    ],
+    "ON": [
+      "ontario"
+    ],
+    "QC": [
+      "quebec49",
+      "quebec-max"
+    ],
+    "BC": [
+      "bc49",
+      "bc5050",
+      "bc-poker"
+    ],
+    "AB": [
+      "western649", "western-max"
+    ],
+    "SK": [
+      "western649", "western-max"
+    ],
+    "MB": [
+      "western649", "western-max"
+    ],
+    "NT": [
+      "territories"
+    ],
+    "YT": [
+      "territories"
+    ],
+    "NU": [
+      "territories"
+    ]
+  },
+  "national_overrides": {
+    "QC": {
+      "max": {"type": "quebec", "url": "https://loteries.lotoquebec.com/loteries-endpoints/en/resultats/sommaires/noproduits", "product": "223"},
+      "649": {"type": "quebec", "url": "https://loteries.lotoquebec.com/loteries-endpoints/en/resultats/sommaires/noproduits", "product": "212"}
+    },
+    "BC": {
+      "649": {"type": "western", "url": "https://www.playnow.com/services2/lotto/draw/six49/{date}"},
+      "daily-grand": {"type": "western", "url": "https://www.playnow.com/services2/lotto/draw/western/dgrd/{date}"}
+    },
+    "western": {
+      "649": {"type": "wclc", "url": "https://www.wclc.com/winning-numbers/lotto-649-extra.htm"},
+      "max": {"type": "wclc", "url": "https://www.wclc.com/winning-numbers/lotto-max-extra.htm"}
+    }
+  },
+  "region_groups": {"western": ["AB", "SK", "MB"]},
+  "additional_endpoints": {
+    "quebec_products": [
+      "212",
+      "223",
+      "239",
+      "202026001",
+      "13",
+      "228",
+      "214",
+      "205",
+      "208",
+      "207",
+      "234",
+      "218",
+      "226",
+      "225",
+      "221",
+      "227",
+      "231",
+      "202025004"
+    ],
+    "bc_jackpots": [
+      "https://www.playnow.com/services2/lotto/jackpot/bc49",
+      "https://www.playnow.com/services2/lotto/jackpot/six49",
+      "https://www.playnow.com/services2/lotto/jackpot/lmax",
+      "https://www.playnow.com/services2/lotto/jackpot/dgrd"
+    ],
+    "alberta_jackpots": [
+      "https://albertawebapi.playalberta.ca/api/pjp/getprogressivejackpots",
+      "https://albertawebapi.playalberta.ca/api/v1/GetExternalProgressiveJackpots",
+      "https://gamesrv1.playalberta.ca/api/v1/TICKER/ns/128/"
+    ],
+    "western_max": "https://www.playnow.com/services2/lotto/draw/western/max/{date}",
+    "western_649_national": "https://www.playnow.com/services2/lotto/draw/six49/{date}"
+  }
+}

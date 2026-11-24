@@ -214,6 +214,9 @@
         "type": {
           "const": "end"
         },
+        "action": {
+          "enum": ["balance-demo", "private-balance"]
+        },
         "prompt": {
           "$ref": "#/$defs/prompt"
         }

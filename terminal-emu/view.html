@@ -25,6 +25,7 @@
   <div id="digits" aria-label="Keypad"></div>
   <div class="controls">
     <label>Extension <input id="extension" inputmode="numeric" value="6501" maxlength="10"></label>
+    <label>Test caller ID <input id="caller" inputmode="numeric" maxlength="10" placeholder="Optional" style="width:8rem" aria-label="Synthetic ten-digit InfoLine caller ID"></label>
     <button id="dial">Dial</button><button id="hangup">Hang up</button>
   </div>
   <p id="status" aria-live="polite">Idle</p>
@@ -32,10 +33,10 @@
 <details><summary>Signal trace</summary><pre id="trace"></pre></details>
 <script>
   const el = (id) => document.getElementById(id);
-  async function send(path, value) {
+  async function send(path, value, caller) {
     const response = await fetch(path, {
       method:"POST", headers:{"X-Coinline-Terminal":"local","Content-Type":"application/json"},
-      body: JSON.stringify({value}),
+      body: JSON.stringify({value,caller}),
     });
     if (!response.ok) el("status").textContent = "Action unavailable";
   }
@@ -51,7 +52,7 @@
     button.onclick = () => send("/press", "k"+index);
     el("keys").appendChild(button);
   }
-  el("dial").onclick = () => send("/dial", el("extension").value.trim());
+  el("dial").onclick = () => send("/dial", el("extension").value.trim(), el("caller").value.trim());
   el("hangup").onclick = () => send("/press","hangup");
   async function poll() {
     try {

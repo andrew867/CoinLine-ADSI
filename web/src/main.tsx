@@ -8,6 +8,7 @@ type Node = {
   type: "menu" | "message" | "provider" | "end";
   lines?: string[];
   prompt?: string;
+  action?: "balance-demo" | "private-balance";
   choices?: Choice[];
   continue?: Choice;
   onTimeout?: string;
@@ -118,7 +119,7 @@ function App() {
     let index = 1;
     while (draft.nodes.some((node) => node.id === `${type}-${index}`)) index++;
     const id = `${type}-${index}`;
-    const end = draft.nodes.find((node) => node.type === "end")?.id ?? draft.entry;
+    const end = draft.nodes.find((node) => node.type === "end" && !node.action)?.id ?? draft.entry;
     const back = { digit: "0", label: "Back", target: end };
     const fields = type === "end" ? { prompt: "Goodbye." } :
       type === "provider" ? { operation: "weather.current", args: { site: "demo-harbour" },
@@ -269,6 +270,11 @@ function App() {
             onChange={(event) => edit({ lines: event.target.value.split("\n") })} /></label>}
           {chosen.type !== "provider" && <label>Voice prompt<textarea rows={2} value={chosen.prompt ?? ""}
             onChange={(event) => edit({ prompt: event.target.value })} /></label>}
+          {chosen.type === "end" && <label>Action<select value={chosen.action ?? ""}
+            onChange={(event) => edit({ action: event.target.value as Node["action"] || undefined })}>
+            <option value="">End call</option><option value="balance-demo">Demo banking</option>
+            <option value="private-balance">Private banking</option>
+          </select></label>}
           {(chosen.choices ?? (chosen.continue ? [chosen.continue] : [])).map((choice, index) => {
             const change = (update: Partial<Choice>) => chosen.choices
               ? edit({ choices: chosen.choices.map((old, i) => i === index ? { ...old, ...update } : old) })

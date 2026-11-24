@@ -39,12 +39,12 @@ async def fetch(client, operation, key):
         return None
 
 
-def rss(data):
+def rss(data, source_fallback=None):
     root = ElementTree.fromstring(data)
     channel = root.find("channel")
     if channel is None:
         return None
-    source = (channel.findtext("title") or "").strip()
+    source = (channel.findtext("title") or "").strip() or source_fallback
     if not source:
         return None
     rows = []

@@ -7,7 +7,8 @@ RUN npm run build
 
 FROM python:3.13-slim-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends espeak-ng \
-    && useradd --system --uid 10002 --home-dir /opt/coinline coinline
+    && useradd --system --uid 10002 --home-dir /opt/coinline coinline \
+    && install -d -o coinline -g coinline /var/lib/coinline/providers
 WORKDIR /opt/coinline
 COPY service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

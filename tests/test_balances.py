@@ -9,6 +9,26 @@ from coinline_adsi.balances import Approvals, ProviderUnavailable, SimpleFIN
 
 
 class BalanceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_recent_transactions_bound_to_enrolled_account(self):
+        now = datetime(2026, 2, 7, 15, tzinfo=UTC)
+        def route(request):
+            self.assertNotIn("balances-only", request.url.params)
+            self.assertEqual(request.url.params["account"], "fixture-account")
+            self.assertEqual(int(request.url.params["end-date"]), int(now.timestamp()))
+            self.assertEqual(int(request.url.params["end-date"]) - int(request.url.params["start-date"]), 30 * 86400)
+            return httpx.Response(200, json={"accounts": [{"id": "fixture-account", "conn_id": "fixture-connection", "currency": "CAD", "transactions": [
+                {"posted": int(now.timestamp()) - 600, "description": "Demo deposit", "amount": "42.17"},
+                {"posted": 0, "description": "Pending", "amount": "-5.00"},
+            ]}]})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as client:
+            adapter = SimpleFIN(client)
+            url = "https://fixture:fixture@bridge.simplefin.org/simplefin"
+            records = await adapter.transactions(url, "fixture-connection", "fixture-account", now)
+            self.assertEqual(len(records), 1)
+            self.assertEqual(records[0].amount, Decimal("42.17"))
+            with self.assertRaises(ProviderUnavailable):
+                await adapter.transactions(url, "wrong-connection", "fixture-account", now)
+
     async def test_demo_provider_claim_and_read(self):
         now = datetime(2026, 2, 7, 15, tzinfo=UTC)
 

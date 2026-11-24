@@ -67,6 +67,21 @@ python tests/check_design.py
 
 Record the injection schedule, spill boundaries, observed digit timing, acknowledgment decisions, active map and final call state. The stale-only run must report zero accepted actions on the new map.
 
+## Canadian InfoLine provider acceptance
+
+| Case | Pass condition and evidence |
+| --- | --- |
+| R01 Numbering | Import the CNA ZIP using only in-service assignments. Independently resolve two prefixes within one shared NPA to different provinces. Unknown and withheld numbers prompt manual selection. |
+| R02 Weather | Match ECCC city and province exactly, round latitude and longitude to three decimals, validate the observation province, show the returned station and enforce source freshness. |
+| R03 News | Preserve the RSS publisher and publication date, including a configured publisher label for a feed with an empty channel title. Exercise Headlinefeed publisher and title queries. Use unavailable or a bounded cached record on failures. |
+| R04 Markets | Allow only configured watchlist symbols, preserve currency and source timestamp, reuse concurrent hourly requests and verify Twelve Data and Alpha Vantage budgets independently. |
+| R05 Regional draws | Validate the date, main number count and uniqueness, bonus range, regional supplement and Gold Ball format. Cover Québec HTML, WCLC dated blocks, ALC JSON and PlayNow sub-draws. Withhold an unavailable regional result. |
+| R06 SIP caller ID | The authenticated standalone terminal supplies a reserved synthetic test identity. The gateway delivers its prefix to the application and the fixture-selected weather city appears on the ADSI display. Native Asterisk comparison T09 remains required. |
+| R07 Banking | Navigate Finance to the lab PIN prompt, open the synthetic balance and two dated transactions, exit and verify display clearing. Mock SimpleFIN data proves account binding, date filters and posted transaction limits. Verify real banking only on the qualified private route. |
+| R08 Configuration and recovery | Validate both bundled graphs, preserve edited applications and immutable revisions, retain provider snapshots and quota counters across restarts, and keep credentials, caller IDs and raw provider responses out of repository artifacts. |
+
+CI runs the deterministic provider cases in `tests/test_regional.py` and `tests/test_balances.py` and the live SIP cases in `tests/live_sip_app.py` and `tests/live_balance_demo.py`. Actual source probes and the status of unsupported operator feeds are recorded separately from the fixture gate.
+
 ## Physical qualification record
 
 | Target | SDC | FDM | Graphics |

@@ -13,6 +13,7 @@ from coinline_adsi.main import app
 ROOT = Path(__file__).parents[1]
 EXAMPLE = json.loads((ROOT / "fixtures/apps/weather.graph.json").read_text(encoding="utf-8"))
 INFOLINE = json.loads((ROOT / "service/coinline_adsi/infoline.json").read_text(encoding="utf-8"))
+REGIONAL = json.loads((ROOT / "service/coinline_adsi/infoline-regional.json").read_text(encoding="utf-8"))
 HEADERS = {"X-Coinline-CSRF": "request"}
 
 
@@ -20,6 +21,7 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
     async def test_bundled_graph_validation(self):
         self.assertEqual(graph.validate(EXAMPLE), [])
         self.assertEqual(graph.validate(INFOLINE), [])
+        self.assertEqual(graph.validate(REGIONAL), [])
 
     async def test_weather_success_failure_and_return(self):
         for fault, expected in ((None, "DEMO WEATHER"), ("stale", "STALE DEMO WX"), ("unavailable", "DEMO WX UNAVAILABLE")):

@@ -13,6 +13,7 @@
 #include <iostream>
 #include <mutex>
 #include <numbers>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -470,7 +471,14 @@ int main(int argc, char **argv)
         bool passed = true;
         {
             pj::AccountConfig config;
-            config.idUri = "sip:lab@" + host;
+            std::string caller = "lab";
+            if (const char *testCaller = std::getenv("ADSI_EMULATOR_CALLER_ID")) {
+                if (scenario == "interactive" && extension == "6501" &&
+                    std::regex_match(testCaller, std::regex("[2-9][0-9]{2}[2-9][0-9]{6}"))) {
+                    caller = testCaller;
+                }
+            }
+            config.idUri = "sip:" + caller + "@" + host;
             config.mediaConfig.transportConfig.port = 0;
             config.sipConfig.authCreds.emplace_back("digest", "*", "lab", 0, password);
             pj::Account account;

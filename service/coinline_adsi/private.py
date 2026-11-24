@@ -114,11 +114,13 @@ class PrivateBalances:
             await self.store._log(db, "bank_unlink", subject)
         self.staged.pop(subject, None)
 
-    async def call(self, caller, link, say):
+    async def call(self, caller, link, say, *, connected=False):
         number = _number(caller)
         enrolled = None if number is None else await self.store._one(
             "SELECT subject, alias, sealed FROM bank_links WHERE phone_key=%s", (self.indexed("phone", number),))
-        if enrolled is None or not await link.connect():
+        if enrolled is None or not (link.data_mode if connected else await link.connect()):
+            if connected:
+                await link.release()
             await say("Private balance service unavailable.")
             return
         subject = enrolled["subject"]
@@ -143,6 +145,7 @@ class PrivateBalances:
         finally:
             self.approvals.pending.pop(challenge, None)
         if approved:
+            deadline = asyncio.get_running_loop().time() + 300
             try:
                 balance = await self._balance(enrolled)
                 as_of = balance.as_of.strftime("%Y-%m-%d %H:%M UTC")
@@ -155,9 +158,12 @@ class PrivateBalances:
                     rows.extend(["Available", available])
                 else:
                     rows.extend([enrolled["alias"], "0 Exit"])
-                await link.transfer(wire.screen(rows, [("Exit", "0")]), open_input=True)
+                await link.transfer(wire.screen(rows, [("Exit", "0"), ("Trans", "1")]), open_input=True)
                 try:
-                    await link.selection(60)
+                    if await link.selection(60) == "1":
+                        from .balances import show_transactions
+                        await show_transactions(link, await self._account_data(enrolled, transactions=True),
+                                                authorize=lambda: self._active(enrolled), deadline=deadline)
                 except TimeoutError:
                     pass
             except (ProviderUnavailable, InvalidToken):
@@ -170,16 +176,20 @@ class PrivateBalances:
         if any(subject == enrolled["subject"] and tick > now - 60 for subject, tick in self.recent):
             raise ProviderUnavailable("Balance unavailable.")
         self.recent.append((enrolled["subject"], now))
-        async def active():
-            return await self.store._one("SELECT sealed FROM bank_links WHERE subject=%s", (enrolled["subject"],))
-        record = await active()
+        return await self._account_data(enrolled)
+
+    async def _active(self, enrolled):
+        record = await self.store._one("SELECT sealed FROM bank_links WHERE subject=%s", (enrolled["subject"],))
         if record is None or record["sealed"] != enrolled["sealed"]:
             raise Unlinked("Balance unavailable.")
+        return record
+
+    async def _account_data(self, enrolled, *, transactions=False):
+        record = await self._active(enrolled)
         access = json.loads(self.cipher.decrypt(bytes(record["sealed"])))
-        balance = await self.bridge.balance(access["access"], access["connection"], access["account"])
-        record = await active()
-        if record is None or record["sealed"] != enrolled["sealed"]:
-            raise Unlinked("Balance unavailable.")
+        fetch = self.bridge.transactions if transactions else self.bridge.balance
+        balance = await fetch(access["access"], access["connection"], access["account"])
+        await self._active(enrolled)
         return balance
 
 

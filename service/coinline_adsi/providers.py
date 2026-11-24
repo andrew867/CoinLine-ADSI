@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import re
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -13,6 +14,7 @@ from defusedxml import ElementTree
 from . import graph, livefeeds, wire
 from .assistant import InformationDesk
 from .link import Link
+from .regional import Regional
 
 
 DATAMART = "https://dd.weather.gc.ca/today/citypage_weather"
@@ -54,8 +56,10 @@ def fixture(operation, args, fault=None):
 
 
 def check_config(config: dict) -> None:
-    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds"}:
+    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional"}:
         raise ValueError("Unknown provider configuration field.")
+    if type(config.get("regional", True)) is not bool:
+        raise ValueError("Regional configuration is a boolean.")
     sites = config.get("sites", {})
     if not isinstance(sites, dict) or len(sites) > 30:
         raise ValueError("Configure up to 30 Atlantic weather sites.")
@@ -113,6 +117,10 @@ class Providers:
         self.desk = InformationDesk(self.client)
         self.weather_cache = {}
         self.weather_refresh = asyncio.Lock()
+        self.regional = Regional() if os.getenv("ADSI_REGIONAL_ENABLE") == "1" else None
+
+    def regional_enabled(self, config):
+        return self.regional is not None and config.get("regional", True)
 
     async def _weather(self, site):
         now = datetime.now(UTC)
@@ -144,13 +152,35 @@ class Providers:
                 pass
             return cached[1] if cached else None
 
-    async def lookup(self, config, operation, args):
+    async def lookup(self, config, operation, args, province=None):
         required, _ = graph.ARGUMENTS[operation]
         key = args[next(iter(required))]
         if operation.startswith("weather.") and key in config.get("sites", {}):
             return await self._weather_result(operation, config["sites"][key])
         if operation == "assistant.answer":
             return await self.desk.answer(key) if config.get("assistant") else None
+        if self.regional_enabled(config):
+            try:
+                if operation.startswith("weather.") and "|" in key:
+                    return await self.regional.weather(operation, key)
+                if operation == "news.headlines":
+                    if key == "local":
+                        key = f"local:{province}" if province else "canada"
+                    if key == "atlantic":
+                        key = "local:NL"
+                    record = await self.regional.news(key)
+                elif operation == "market.quote":
+                    record = await self.regional.quote(key)
+                elif operation == "lottery.draw":
+                    record = await self.regional.lottery(key, province, args.get("draw_date"))
+                else:
+                    record = None
+                if record:
+                    return self._public_record(operation, record, "LIVE")
+            except (KeyError, ValueError, TypeError, IndexError, AttributeError, OverflowError):
+                pass
+            if operation not in config.get("manual", {}) and not config.get("feeds", {}).get(operation):
+                return None
         entries = config.get("manual", {}).get(operation, {})
         if operation == "lottery.draw" and "draw_date" in args:
             key += "/" + args["draw_date"]
@@ -224,6 +254,8 @@ class Providers:
         while True:
             try:
                 config = await config_source()
+                if self.regional_enabled(config["value"]):
+                    await self.regional.numbering()
                 for site in config["value"].get("sites", {}).values():
                     try:
                         async with asyncio.timeout(5):

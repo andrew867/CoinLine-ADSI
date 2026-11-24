@@ -49,6 +49,14 @@ class Balance:
     as_of: datetime
 
 
+@dataclass(frozen=True)
+class Transaction:
+    posted: datetime
+    amount: Decimal
+    description: str
+    currency: str
+
+
 def _decimal(value):
     if not isinstance(value, str) or not re.fullmatch(r"-?\d{1,15}(\.\d{1,8})?", value):
         raise ValueError("invalid decimal amount")
@@ -97,9 +105,39 @@ class SimpleFIN:
         except (httpx.HTTPError, KeyError, TypeError, ValueError, InvalidOperation, OverflowError, AttributeError):
             raise ProviderUnavailable("Balance unavailable.") from None
 
-    async def accounts(self, access_url, account=None):
+    async def transactions(self, access_url, connection, account, now=None):
+        now = now or datetime.now(UTC)
+        start = now - timedelta(days=30)
+        try:
+            rows = await self.accounts(access_url, account, start=start, end=now)
+            matches = [row for row in rows if row.get("id") == account and row.get("conn_id") == connection]
+            if len(matches) != 1:
+                raise ProviderUnavailable("Transactions unavailable.")
+            row = matches[0]
+            currency = row["currency"]
+            if not re.fullmatch(r"[A-Z]{3}", currency):
+                raise ValueError
+            records = row["transactions"]
+            if not isinstance(records, list) or len(records) > 2000:
+                raise ValueError
+            result = []
+            for record in records:
+                if record.get("pending") or not record.get("posted"):
+                    continue
+                posted = datetime.fromtimestamp(record["posted"], UTC)
+                if start <= posted <= now:
+                    description = " ".join(str(record.get("description") or "Transaction").split())[:80]
+                    result.append(Transaction(posted, _decimal(record["amount"]), description, currency))
+            return sorted(result, key=lambda transaction: transaction.posted, reverse=True)[:10]
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, InvalidOperation, OverflowError, AttributeError):
+            raise ProviderUnavailable("Transactions unavailable.") from None
+
+    async def accounts(self, access_url, account=None, *, start=None, end=None):
         url = _url(access_url, claim=False)
         params = {"version": "2", "balances-only": "1"}
+        if start is not None and end is not None:
+            params.pop("balances-only")
+            params.update({"start-date": str(int(start.timestamp())), "end-date": str(int(end.timestamp()))})
         if account is not None:
             params["account"] = account
         try:
@@ -167,11 +205,48 @@ class Approvals:
         return verified
 
 
-async def demo_balance(link: Link, say, access_code: str):
+async def show_transactions(link, transactions, *, authorize=None, deadline=None):
+    import asyncio
+    from .graph import handset_text
+    def remaining():
+        return 30 if deadline is None else min(30, deadline - asyncio.get_running_loop().time())
+    if not transactions:
+        if authorize:
+            await authorize()
+        if remaining() <= 0:
+            return
+        await link.transfer(wire.screen(["NO RECENT ACTIVITY", "0 Exit"], [("Exit", "0")]), open_input=True)
+        try:
+            await link.selection(max(0, remaining()))
+        except TimeoutError:
+            pass
+        return
+    for index, record in enumerate(transactions):
+        if authorize:
+            await authorize()
+        if remaining() <= 0:
+            return
+        amount = f"{record.currency} {record.amount}"
+        lines = [f"ACTIVITY {index + 1}/{len(transactions)}", record.posted.strftime("%d %b %Y"),
+                 amount if len(amount) <= 20 else "Amount unavailable", handset_text(record.description)[:20] or "Transaction"]
+        keys = [("Exit", "0")]
+        if index + 1 < len(transactions):
+            keys.append(("Next", "9"))
+        await link.transfer(wire.screen(lines, keys), open_input=True)
+        try:
+            if await link.selection(max(0, remaining())) != "9":
+                return
+        except TimeoutError:
+            return
+
+
+async def demo_balance(link: Link, say, access_code: str, *, connected=False, transactions=False):
     if not re.fullmatch(r"[0-9]{8}", access_code):
+        if connected:
+            await link.release()
         await say("Balance demonstration unavailable.")
         return
-    display = await link.connect()
+    display = link.data_mode if connected else await link.connect()
     if display:
         await link.transfer(wire.screen(["DEMO BALANCE", "Enter lab code"], []), open_input=True)
     else:
@@ -192,10 +267,15 @@ async def demo_balance(link: Link, say, access_code: str):
             verified = True
             break
     if display and verified:
-        await link.transfer(wire.screen(["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "0 Exit"], [("Exit", "0")]),
+        keys = [("Exit", "0"), ("Trans", "1")] if transactions else [("Exit", "0")]
+        await link.transfer(wire.screen(["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "1 Trans  0 Exit" if transactions else "0 Exit"], keys),
                             open_input=True)
         try:
-            await link.selection(20)
+            if await link.selection(20) == "1" and transactions:
+                await show_transactions(link, [
+                    Transaction(datetime(2026, 2, 7, tzinfo=UTC), Decimal("-12.34"), "Demo groceries", "CAD"),
+                    Transaction(datetime(2026, 2, 6, tzinfo=UTC), Decimal("120.00"), "Demo deposit", "CAD"),
+                ])
         except TimeoutError:
             pass
         await link.transfer(wire.screen(["GOODBYE"], []))

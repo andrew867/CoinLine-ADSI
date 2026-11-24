@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import threading
@@ -24,17 +25,22 @@ class Dialer:
     def reset(self):
         self.state = {"lines": ["ON HOOK"], "keys": [""] * 6, "status": "Idle", "trace": []}
 
-    def dial(self, ext):
+    def dial(self, ext, caller=""):
         with self.lock:
             if self.call and self.call.poll() is None:
                 return False
             self.reset()
+            environment = dict(os.environ)
+            environment.pop("ADSI_EMULATOR_CALLER_ID", None)
+            if caller:
+                environment["ADSI_EMULATOR_CALLER_ID"] = caller
             command = [self.binary, self.host, "interactive", ext] if self.binary else [
                 "docker", "compose", "--profile", "verify", "run", "--rm", "-T", "--no-deps",
+                *(["-e", "ADSI_EMULATOR_CALLER_ID"] if caller else []),
                 "terminal-emu", self.host, "interactive", ext,
             ]
             self.call = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                         stderr=subprocess.DEVNULL, text=True, encoding="utf-8")
+                                         stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=environment)
             self.state["status"] = "Dialing"
             threading.Thread(target=self._read, args=(self.call,), daemon=True).start()
             return True
@@ -116,7 +122,10 @@ def main():
                 request = json.loads(self.rfile.read(length))
                 value = request.get("value", "")
                 if self.path == "/dial" and re.fullmatch(r"[0-9]{1,10}", value):
-                    result = dialer.dial(value)
+                    caller = request.get("caller", "")
+                    if caller and (value != "6501" or not re.fullmatch(r"[2-9]\d{2}[2-9]\d{6}", caller)):
+                        raise ValueError
+                    result = dialer.dial(value, caller)
                 elif self.path == "/press" and re.fullmatch(r"[0-9*#]|k[1-6]|hangup", value):
                     result = dialer.press(value)
                 else:

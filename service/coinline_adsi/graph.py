@@ -182,7 +182,7 @@ class Session:
     def _format(self, template: str) -> str:
         return TOKEN.sub(lambda match: str(self.values.get(match[1], {}).get(match[2], ""))[:160], template)
 
-    async def settle(self, lookup: Lookup, prepare=None) -> dict:
+    async def settle(self, lookup: Lookup, prepare=None, provider_timeout=2) -> dict:
         for _ in range(32):
             current = self.nodes[self.node]
             if current["type"] != "provider" or self.ended:
@@ -191,7 +191,7 @@ class Session:
             result = None
             if arguments is not None:
                 try:
-                    async with asyncio.timeout(5 if current["operation"] == "assistant.answer" else 2):
+                    async with asyncio.timeout(5 if current["operation"] == "assistant.answer" else provider_timeout):
                         result = await lookup(current["operation"], arguments)
                 except TimeoutError:
                     pass
@@ -242,12 +242,14 @@ class Session:
             self.ended = True
 
 
-async def run_call(graph: dict, lookup: Lookup, link: Link, say, prepare=None):
+async def run_call(graph: dict, lookup: Lookup, link: Link, say, prepare=None, provider_timeout=2, handoff=None):
     session = Session(graph)
     display = await link.connect()
     while True:
-        view = await session.settle(lookup, prepare)
+        view = await session.settle(lookup, prepare, provider_timeout)
         if view["ended"]:
+            if handoff and not session.ended and await handoff(session.nodes[session.node]):
+                return
             await link.release()
             if view["prompt"]:
                 await say(view["prompt"])

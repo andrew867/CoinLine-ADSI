@@ -33,7 +33,11 @@ Run `sh tests/rtp-impairments.sh` on an idle, isolated reference service with Li
 
 Open `http://127.0.0.1:8091` for the separate SIP terminal UI. Its dial, keypad, softkeys and trace control a new PJSUA2 call. The authoring console simulator instead exercises the graph with fixed fixtures. In the console, save a valid draft and publish it to apply the revision for new calls on extension 6501. Application history provides rollback to an older revision. The graph editor supports focusable nodes and explicit transition fields.
 
+For extension 6501, enter an optional synthetic ten-digit caller ID in the terminal UI to exercise Canadian NPA-NXX routing; leave it blank for manual location selection. The SIP endpoint still uses the generated lab credential. The caller ID is never used as private banking authorization.
+
 ## Provider configuration
+
+Set `ADSI_REGIONAL_ENABLE=1` in `.env` for the Canadian provider catalogue and assign local values to `ADSI_HEADLINEFEED_KEY`, `ADSI_TWELVE_DATA_KEY` and `ADSI_ALPHA_VANTAGE_KEY` to activate the corresponding services. Recreate the app container after changing the environment. The [regional configuration reference](../spec/regional-providers.md) describes all endpoints, stock sectors, Canadian lottery routing, quotas and current gaps. The public-provider cache uses a named Docker volume. The sample application migrates automatically only if its original draft and published route are untouched; user-authored revisions are preserved.
 
 Fixture content is labeled `DEMO`. In Setup, an operator may define ECCC Datamart sites using `place`, `province`, `code` and `zone`. The `prefixes` map keys six-digit CNA assignments to site identifiers. The caller can confirm or change the suggested city. The optional `manual` catalogue accepts attributed news, quotes and draw results after the operator confirms the intended use is permitted. See the [data contract](../spec/data-and-access.md) for field and freshness rules.
 

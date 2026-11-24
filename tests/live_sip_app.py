@@ -15,13 +15,14 @@ from live_api import DATA, lab_value
 
 
 class TerminalCall:
-    def __init__(self, extension):
+    def __init__(self, extension, synthetic_caller=None):
         self.messages = queue.Queue()
         self.trace = []
         self.name = "coinline-adsi-test-" + uuid4().hex[:12]
         self.process = subprocess.Popen(
             ["docker", "compose", "--profile", "verify", "run", "--name", self.name, "--rm", "-T",
-             "--no-deps", "terminal-emu", "gateway", "interactive", extension],
+             "--no-deps", *(["-e", f"ADSI_EMULATOR_CALLER_ID={synthetic_caller}"] if synthetic_caller else []),
+             "terminal-emu", "gateway", "interactive", extension],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         )
         threading.Thread(target=self._read, daemon=True).start()
@@ -52,8 +53,8 @@ class TerminalCall:
 
 
 @contextmanager
-def terminal(extension="6501"):
-    call = TerminalCall(extension)
+def terminal(extension="6501", synthetic_caller=None):
+    call = TerminalCall(extension, synthetic_caller)
     try:
         yield call
     finally:
@@ -66,10 +67,20 @@ def terminal(extension="6501"):
                                timeout=8, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def main():
-    root = f"http://127.0.0.1:{lab_value('ADSI_WEB_PORT', '8080')}/api/v1"
-    with httpx.Client(base_url=root, timeout=8, headers={"X-Coinline-CSRF": "request"}, trust_env=False) as client:
-        client.post("/session", json={"password": lab_value("ADSI_ADMIN_PASSWORD")}).raise_for_status()
+@contextmanager
+def provider_override(client, **updates):
+    original = client.get("/providers").raise_for_status()
+    value = original.json()["value"]
+    settings = {**value, **updates}
+    current = client.put("/providers", json=settings, headers={"If-Match": original.headers["etag"]}).raise_for_status()
+    try:
+        yield
+    finally:
+        client.put("/providers", json=value, headers={"If-Match": current.headers["etag"]}).raise_for_status()
+
+
+def verify_revision(client):
+    with provider_override(client, regional=False, sites={}, prefixes={}):
         active = client.get("/routes").raise_for_status().json()[0]["revision_id"]
         original = next(item["id"] for item in client.get("/apps").raise_for_status().json()
                         if any(revision["id"] == active for revision in
@@ -85,11 +96,20 @@ def main():
                             json={"routes": ["infoline"]}).raise_for_status()
                 with terminal() as later:
                     later.display("REVISION B")
+                    time.sleep(0.8)
                     first.press("2")
+                    first.display("WEATHER")
+                    time.sleep(0.8)
+                    first.press("1")
                     first.display("DEMO WEATHER")
+                    time.sleep(0.8)
                     later.press("0")
                     first.press("0")
+                    first.display("WEATHER")
+                    time.sleep(0.8)
+                    first.press("0")
                     first.display("COINLINE INFOLINE")
+                    time.sleep(0.8)
                     first.press("0")
                     assert later.process.wait(timeout=10) == 0
                     assert first.process.wait(timeout=10) == 0
@@ -97,7 +117,27 @@ def main():
                 client.post(f"/apps/{original}/activate",
                             json={"revision": active, "routes": ["infoline"]}).raise_for_status()
                 client.post(other + "/archive", json={"disable_routes": False}).raise_for_status()
+
+
+def main():
+    root = f"http://127.0.0.1:{lab_value('ADSI_WEB_PORT', '8080')}/api/v1"
+    with httpx.Client(base_url=root, timeout=8, headers={"X-Coinline-CSRF": "request"}, trust_env=False) as client:
+        client.post("/session", json={"password": lab_value("ADSI_ADMIN_PASSWORD")}).raise_for_status()
+        verify_revision(client)
+        # Select from a local synthetic prefix mapping. This tests SIP caller ID even with live feeds disabled.
+        with provider_override(client, regional=False,
+                               sites={"test-site": {"place": "Test", "province": "NL", "code": "s0000001", "zone": "America/St_Johns"}},
+                               prefixes={"289555": "test-site"}):
+            with terminal(synthetic_caller="2895550100") as call:
+                call.display("COINLINE INFOLINE")
+                time.sleep(0.8)
+                call.press("2")
+                call.display("WEATHER")
+                time.sleep(0.8)
+                call.press("1")
+                call.display("Weather for Test?")
     print("Verified revision pinning across two real SIP calls.")
+    print("Verified authenticated synthetic caller ID and prefix-based location suggestion.")
 
 
 if __name__ == "__main__":

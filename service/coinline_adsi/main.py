@@ -16,8 +16,9 @@ from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
 from .link import lab_call
 from .private import PrivateBalances, configure
-from .providers import Providers, choose_site
-from .store import DEMO_REVISION, Store, StoreError
+from .providers import Providers, choose_site, prefix
+from .regional import CAPITALS, choose, choose_weather
+from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, Store, StoreError
 
 
 @asynccontextmanager
@@ -50,29 +51,65 @@ async def lifespan(app: FastAPI):
             if not requested or not await fdm.install(link, requested["text"], requested["version"]):
                 await say("No resident download is available.")
             return
-        revision = await store.route(route) if store else None
+        revision = await store.route("infoline" if route == "private-infoline" else route) if store else None
         if revision is None:
             await say("This application is unavailable.")
             return
         config = (await store.setting("providers"))["value"]
+        providers = app.state.providers
+        regional = providers.regional if providers.regional_enabled(config) else None
         location = None
+        inferred = None
+        resolved = False
         assistant_used = False
         document = revision["graph"]
-        if revision["id"] == DEMO_REVISION and not config.get("assistant"):
+        if revision["id"] in (DEMO_REVISION, LEGACY_DEMO_REVISION) and not config.get("assistant"):
             welcome = document["nodes"][0]
             welcome["choices"] = [choice for choice in welcome["choices"] if choice["digit"] != "5"]
             welcome["lines"][-1] = "0 Exit"
-            welcome["prompt"] = "CoinLine InfoLine. Press one for news, two for weather, three for stocks, four for lottery, or zero to exit."
+            category = "finance" if revision["id"] == DEMO_REVISION else "stocks"
+            welcome["prompt"] = f"CoinLine InfoLine. Press one for news, two for weather, three for {category}, four for lottery, or zero to exit."
             document["nodes"] = [node for node in document["nodes"] if node["id"] not in ("help", "help-result")]
 
         async def prepare(operation, arguments):
-            nonlocal location, assistant_used
+            nonlocal location, inferred, resolved, assistant_used
+            if regional and not resolved:
+                resolved = True
+                try:
+                    async with asyncio.timeout(6):
+                        inferred = await regional.location(prefix(caller))
+                except TimeoutError:
+                    pass
             if operation.startswith("weather.") and arguments.get("site") == "selected":
                 if location is None:
-                    location = await choose_site(config, caller, link, say)
+                    location = (await choose_weather(link, say, inferred) if regional and not config.get("sites")
+                                else await choose_site(config, caller, link, say))
                 if not location:
                     return None
+                if regional and "|" in location and not inferred:
+                    inferred = location.split("|", 1)
                 return {"site": location}
+            if regional and operation == "market.quote" and arguments.get("instrument") == "selected":
+                categories = regional.catalog["stocks"]["categories"]
+                category = await choose(link, say, "Stock sectors", [(key, key) for key in categories])
+                if category:
+                    symbol = await choose(link, say, category, [(symbol, symbol) for symbol in categories[category]])
+                    return {"instrument": symbol} if symbol else None
+                return None
+            if regional and operation == "news.headlines" and arguments.get("topic") == "local" and not inferred:
+                province = await choose(link, say, "Choose province", [(key, key) for key in CAPITALS])
+                if not province:
+                    return None
+                inferred = [province, ""]
+            if regional and operation == "lottery.draw" and arguments.get("game") == "regional":
+                province = inferred[0] if inferred else None
+                if not province:
+                    province = await choose(link, say, "Choose province", [(key, key) for key in CAPITALS])
+                    if province:
+                        inferred = [province, ""]
+                games = regional.catalog["regional_games"].get(province, [])
+                game = await choose(link, say, "Regional draws", [(game, regional.catalog["lottery"][game]["label"]) for game in games])
+                return {"game": game} if game else None
             if operation == "assistant.answer":
                 if assistant_used:
                     return None
@@ -80,9 +117,23 @@ async def lifespan(app: FastAPI):
             return arguments
 
         async def lookup(operation, arguments):
-            return await app.state.providers.lookup(config, operation, arguments)
+            return await providers.lookup(config, operation, arguments, inferred[0] if inferred else None)
 
-        await graph.run_call(document, lookup, link, say, prepare)
+        async def handoff(node):
+            if node.get("action") == "balance-demo":
+                await demo_balance(link, say, os.getenv("ADSI_DEMO_PIN", ""), connected=True, transactions=True)
+                return True
+            if node.get("action") == "private-balance":
+                private = app.state.private
+                if route == "private-infoline" and private and os.getenv("ADSI_PRIVATE_BALANCES") == "1":
+                    await private.call(caller, link, say, connected=True)
+                else:
+                    await link.release()
+                    await say("Private balance service unavailable.")
+                return True
+            return False
+
+        await graph.run_call(document, lookup, link, say, prepare, provider_timeout=20 if regional else 2, handoff=handoff)
 
     origin = os.getenv("ADSI_ARI_URL")
     task = None
@@ -104,6 +155,8 @@ async def lifespan(app: FastAPI):
             refresh_task.cancel()
             await asyncio.gather(refresh_task, return_exceptions=True)
         await app.state.providers.client.aclose()
+        if app.state.providers.regional:
+            await app.state.providers.regional.close()
         if app.state.db:
             await app.state.db.pool.close()
 

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoinLine SIP Terminal</title>
+<style>
+  body { background:#e9eff3; color:#1c2934; font:16px system-ui; margin:2rem auto; max-width:490px; padding:0 1rem }
+  main { background:#263946; color:#e9eff3; padding:1rem; border-radius:12px }
+  h1 { font-size:1.35rem }
+  output { display:block; min-height:6rem; color:#26341c; background:#d2dda9; padding:.7rem; border:4px inset #86996a;
+    font:bold 1.2rem/1.35 monospace; white-space:pre-wrap }
+  button,input { padding:.55rem; border-radius:4px; font:inherit; border:1px solid #768895 }
+  .controls { display:flex; gap:.4rem; flex-wrap:wrap; margin:.75rem 0 }
+  input { width:5rem }
+  #keys,#digits { display:grid; gap:.3rem; margin:.5rem 0 }
+  #keys { grid-template-columns:repeat(6,1fr) }
+  #digits { grid-template-columns:repeat(3,1fr) }
+  #keys button { font-size:.75rem; padding:.3rem }
+  pre { overflow:auto; font-size:.8rem; white-space:pre-wrap }
+</style>
+<h1>CoinLine SIP Terminal</h1>
+<main>
+  <output id="display" aria-label="Terminal display" aria-live="polite">ON HOOK</output>
+  <div id="keys" aria-label="Softkeys"></div>
+  <div id="digits" aria-label="Keypad"></div>
+  <div class="controls">
+    <label>Extension <input id="extension" inputmode="numeric" value="6501" maxlength="10"></label>
+    <button id="dial">Dial</button><button id="hangup">Hang up</button>
+  </div>
+  <p id="status" aria-live="polite">Idle</p>
+</main>
+<details><summary>Signal trace</summary><pre id="trace"></pre></details>
+<script>
+  const el = (id) => document.getElementById(id);
+  async function send(path, value) {
+    const response = await fetch(path, {
+      method:"POST", headers:{"X-Coinline-Terminal":"local","Content-Type":"application/json"},
+      body: JSON.stringify({value}),
+    });
+    if (!response.ok) el("status").textContent = "Action unavailable";
+  }
+  for (const value of "123456789*0#") {
+    const button = document.createElement("button");
+    button.textContent = value;
+    button.onclick = () => send("/press", value);
+    el("digits").appendChild(button);
+  }
+  for (let index = 1; index <= 6; index++) {
+    const button = document.createElement("button");
+    button.disabled = true;
+    button.onclick = () => send("/press", "k"+index);
+    el("keys").appendChild(button);
+  }
+  el("dial").onclick = () => send("/dial", el("extension").value.trim());
+  el("hangup").onclick = () => send("/press","hangup");
+  async function poll() {
+    try {
+      const state = await (await fetch("/state",{cache:"no-store"})).json();
+      const display = state.lines.join("\n");
+      if (el("display").textContent !== display) el("display").textContent = display;
+      if (el("status").textContent !== state.status) el("status").textContent = state.status;
+      state.keys.forEach((label,index) => {
+        const key = el("keys").children[index];
+        key.textContent = label || "·";
+        key.disabled = !label;
+        key.setAttribute("aria-label", label || "Unassigned softkey");
+      });
+      el("trace").textContent = state.trace.map(event => JSON.stringify(event)).join("\n");
+    } catch {
+      el("status").textContent = "Terminal unavailable";
+    }
+    setTimeout(poll,350);
+  }
+  poll();
+</script>
+</html>

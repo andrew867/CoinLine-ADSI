@@ -1,0 +1,49 @@
+#include "terminal.hpp"
+
+#include <cassert>
+#include <numeric>
+#include <vector>
+
+std::vector<uint8_t> packet(uint8_t kind, uint8_t tag, std::vector<uint8_t> payload)
+{
+    std::vector<uint8_t> result {kind, static_cast<uint8_t>(3 + payload.size()), 1, tag,
+                                 static_cast<uint8_t>(payload.size())};
+    result.insert(result.end(), payload.begin(), payload.end());
+    result.push_back(static_cast<uint8_t>(-std::accumulate(result.begin(), result.end(), 0)));
+    return result;
+}
+
+int main()
+{
+    Terminal terminal(true);
+    const std::vector<uint8_t> lab {0x84, 0x0d, 0x01, 0x82, 0x07, 0x01, 0x40, 0xff, 0x4c, 0x41,
+                                   0x42, 0xff, 0x83, 0x01, 0x01, 0x52};
+    assert(terminal.apply(lab));
+    assert(terminal.line() == "LAB");
+    auto corrupt = lab;
+    corrupt[8] = 'G';
+    assert(!terminal.apply(corrupt));
+    assert(terminal.line() == "LAB");
+    assert(terminal.apply(packet(0x84, 0x86, {})));
+    std::vector<uint8_t> connect {'L',0xff,'C','L','0','1',0,0,0,0,1};
+    const auto key = packet(0x85, 0x80, {2,'I','n','f','o',255,'I','n','f','o',255,152,193,8});
+    const auto screen = packet(0x85, 0x81, {0x81,0,255,'T','E','S','T',255});
+    const auto script = packet(0x85, 0x82, {0,1,6,2,255,3,193,8,255,2,1,2,255});
+    const auto commit = packet(0x85, 0x84, {});
+    assert(terminal.apply(packet(0x85, 0x83, connect)));
+    assert(!terminal.apply(screen));
+    assert(terminal.apply(key));
+    assert(terminal.apply(screen));
+    assert(terminal.resident().empty());
+    assert(terminal.apply(script));
+    assert(terminal.apply(commit));
+    assert(terminal.apply(commit));
+    assert(terminal.resident() == "TEST" && terminal.residentVersion() == 1);
+    connect.back() = 2;
+    assert(terminal.apply(packet(0x85, 0x83, connect)));
+    assert(terminal.apply(key));
+    assert(terminal.apply(packet(0x85, 0x81, {0x81,0,255,'N','E','W',255})));
+    assert(terminal.apply(packet(0x84, 0x85, {})));
+    assert(!terminal.apply(commit));
+    assert(terminal.resident() == "TEST" && terminal.residentVersion() == 1);
+}

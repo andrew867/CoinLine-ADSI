@@ -1,0 +1,103 @@
+name: coinline-adsi
+services:
+  gateway:
+    image: ${ADSI_GATEWAY_IMAGE:-coinline-adsi-gateway}
+    build:
+      context: .
+      dockerfile: deploy/asterisk/Dockerfile
+      target: gateway
+    environment:
+      ADSI_SIP_PASSWORD: ${ADSI_SIP_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_ARI_PASSWORD: ${ADSI_ARI_PASSWORD:?Run deploy/init_lab.py}
+    ports:
+      - "${ADSI_BIND:-127.0.0.1}:${ADSI_SIP_PORT:-5060}:5060/udp"
+      - "${ADSI_BIND:-127.0.0.1}:18000-18039:18000-18039/udp"
+    networks: [lab]
+
+  app:
+    image: ${ADSI_APP_IMAGE:-coinline-adsi-app}
+    build:
+      context: .
+      dockerfile: service/Dockerfile
+    environment:
+      ADSI_ARI_URL: http://gateway:8088
+      ADSI_ARI_PASSWORD: ${ADSI_ARI_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_ADMIN_PASSWORD: ${ADSI_ADMIN_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_DB_HOST: db
+      ADSI_DATABASE_PASSWORD: ${ADSI_DATABASE_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_DEMO_PIN: ${ADSI_DEMO_PIN:-}
+      ADSI_FDM_ENABLE: ${ADSI_FDM_ENABLE:-0}
+    ports:
+      - "127.0.0.1:${ADSI_WEB_PORT:-8080}:8080"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks: [lab, data]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+
+  migrate:
+    image: ${ADSI_APP_IMAGE:-coinline-adsi-app}
+    pull_policy: never
+    command: [python, -m, coinline_adsi.store]
+    environment:
+      ADSI_DB_HOST: db
+      ADSI_DATABASE_PASSWORD: ${ADSI_DATABASE_PASSWORD:?Run deploy/init_lab.py}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [data]
+
+  db:
+    image: postgres:17-bookworm
+    environment:
+      POSTGRES_DB: coinline
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${ADSI_DATABASE_ADMIN_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_DATABASE_PASSWORD: ${ADSI_DATABASE_PASSWORD:?Run deploy/init_lab.py}
+    volumes:
+      - db:/var/lib/postgresql/data
+      - ./deploy/postgres/00-roles.sh:/docker-entrypoint-initdb.d/00-roles.sh:ro
+    networks: [data]
+    healthcheck:
+      test: [CMD, pg_isready, -U, coinline, -d, coinline]
+      interval: 5s
+      timeout: 3s
+      retries: 8
+
+  reference:
+    profiles: [verify]
+    build:
+      context: .
+      dockerfile: deploy/asterisk/Dockerfile
+      target: reference
+    environment:
+      ADSI_SIP_PASSWORD: ${ADSI_SIP_PASSWORD:?Run deploy/init_lab.py}
+    networks: [lab]
+
+  terminal-emu:
+    profiles: [verify]
+    build:
+      context: .
+      dockerfile: terminal-emu/Dockerfile
+    environment:
+      ADSI_SIP_PASSWORD: ${ADSI_SIP_PASSWORD:?Run deploy/init_lab.py}
+      ADSI_FDM_STATE_FILE: /var/lib/terminal/resident.json
+    volumes:
+      - terminal:/var/lib/terminal
+    networks: [lab]
+
+networks:
+  lab: {}
+  data:
+    internal: true
+
+volumes:
+  db:
+    name: ${ADSI_DB_VOLUME:-coinline-adsi_db}
+  terminal: {}

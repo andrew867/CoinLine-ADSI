@@ -1,6 +1,6 @@
 # Source and evidence register
 
-The protocol contract names the reference implementation for each initial behavior. The project will pin exact revisions when the first gateway image and comparative harness are built. Keep public reference links with sanitized evidence. Cite the original source of a waveform or value, and label a synthetic fixture as such.
+The protocol contract names the reference implementation for each initial behavior. The gateway and native reference use Asterisk 22.12.0 with its bundled SIP libraries. The standalone terminal uses PJPROJECT 2.16 and Debian Bookworm SpanDSP 0.0.6+dfsg-2+b1. The Dockerfiles verify the downloaded source archives by SHA-256. Keep public reference links with sanitized evidence. Cite the original source of a waveform or value, and label a synthetic fixture as such.
 
 ## S1 Asterisk, PJSIP, ARI and media
 
@@ -49,4 +49,4 @@ The open protocol defines the one-time claim, HTTP Basic credentials, account sc
 
 ## S10 Packaging and delivery
 
-Compose documents health-aware dependency startup. GitHub documents container publishing and provenance via image digest. [Compose startup ordering](https://docs.docker.com/compose/how-tos/startup-order/) · [GitHub container publishing](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images) · [GitHub provenance](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations)
+Compose documents health-aware dependency startup. Docker documents how image registry exports retain SBOM and provenance attestations. [Compose startup ordering](https://docs.docker.com/compose/how-tos/startup-order/) · [Docker build attestations](https://docs.docker.com/build/metadata/attestations/) · [GitHub container publishing](https://docs.github.com/en/actions/tutorials/publish-packages/publish-docker-images)

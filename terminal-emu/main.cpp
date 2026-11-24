@@ -92,7 +92,7 @@ public:
         bool exchange = displayExchange && (scenario_ == "pcm" || (voiceHeard_ &&
             (scenario_ == "reference" || (keySent_ && ok_))));
         if (scenario_ == "fallback") {
-            exchange = voiceHeard_;
+            exchange = voiceHeard_ && fallbackReply_;
         } else if (scenario_ == "fdm") {
             exchange = terminal_.residentVersion() && terminal_.released();
         } else if (scenario_ == "interactive") {
@@ -105,7 +105,7 @@ public:
     void press(const std::string &input)
     {
         std::lock_guard lock(mutex_);
-        if (input.size() == 1 && std::string("0123456789*#").find(input[0]) != std::string::npos) {
+        if (input.size() == 1 && std::string("0123456789*#ABCD").find(input[0]) != std::string::npos) {
             digit(input[0], false);
         } else if (input.size() == 2 && input[0] == 'k' && input[1] >= '1' && input[1] <= '6') {
             const auto selected = terminal_.key(input[1] - '1');
@@ -160,14 +160,19 @@ private:
         for (const double sample : window_) {
             energy += sample * sample;
         }
-        if ((scenario_ == "fallback" || !alert_ || terminal_.released()) && energy > 160 * 200.0 * 200.0 &&
-            (terminal_.released() || samples_ > rate * 14 / 10)) {
+        const bool pastRelease = releaseSample_ && samples_ >= releaseSample_ + rate * 4 / 10;
+        const bool fallbackAudio = scenario_ == "fallback" && samples_ > rate * 14 / 10;
+        if ((fallbackAudio || pastRelease) && energy > 160 * 200.0 * 200.0) {
             if (!voiceHeard_) {
                 record({{"signal", "voice"}});
                 if (scenario_ == "fallback") {
                     silence(1600);
                     digit('1');
+                    waitForReply_ = samples_ + rate * 19 / 10;
                 }
+            } else if (waitForReply_ && samples_ > waitForReply_ && !fallbackReply_) {
+                record({{"signal", "voice-response"}});
+                fallbackReply_ = true;
             }
             voiceHeard_ = true;
         }
@@ -242,6 +247,9 @@ private:
                 {"lines", terminal_.viewport()}, {"softkeys", labels},
                 {"mode", terminal_.inDataMode() ? "data" : "voice"}});
         if (valid) {
+            if (terminal_.released() && !releaseSample_) {
+                releaseSample_ = samples_;
+            }
             const auto key = terminal_.key(0);
             lab_ |= terminal_.line() == "LAB";
             ok_ |= terminal_.line() == "OK";
@@ -282,11 +290,14 @@ private:
     Json events_ = Json::array();
     unsigned samples_ = 0;
     unsigned casWindows_ = 0;
+    unsigned releaseSample_ = 0;
+    unsigned waitForReply_ = 0;
     bool alert_ = false;
     bool lab_ = false;
     bool ok_ = false;
     bool keySent_ = false;
     bool voiceHeard_ = false;
+    bool fallbackReply_ = false;
 };
 
 class Call : public pj::Call {

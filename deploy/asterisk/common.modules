@@ -1,0 +1,16 @@
+chan_pjsip
+codec_ulaw
+pbx_config
+res_pjproject
+res_pjsip
+res_pjsip_authenticator_digest
+res_pjsip_endpoint_identifier_user
+res_pjsip_pubsub
+res_pjsip_sdp_rtp
+res_pjsip_session
+res_rtp_asterisk
+res_sorcery_astdb
+res_sorcery_config
+res_sorcery_memory
+res_sorcery_memory_cache
+res_timing_timerfd

@@ -1,0 +1,17 @@
+app_stasis
+bridge_simple
+bridge_softmix
+chan_websocket
+res_ari
+res_ari_bridges
+res_ari_channels
+res_ari_events
+res_ari_model
+res_http_websocket
+res_stasis
+res_stasis_answer
+res_stasis_device_state
+res_stasis_playback
+res_stasis_recording
+res_stasis_snoop
+res_websocket_client

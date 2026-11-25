@@ -7,6 +7,7 @@ from uuid import uuid4
 import httpx
 
 from live_api import lab_value
+from live_sip_app import terminal
 
 
 def dial(state_file, *arguments, check=True):
@@ -42,12 +43,22 @@ def main():
             _, restarted = dial(state_file, "resident")
             assert restarted == [{"idle_display": "RESIDENT LAB", "version": 2}]
             assert not client.get("/features").raise_for_status().json()["value"].get("approved")
+            current = client.get("/features").raise_for_status()
+            client.put("/features", headers={"If-Match": current.headers["etag"]},
+                       json={"text": "INFOLINE", "version": 3, "launcher": True, "approved": True}).raise_for_status()
+            _, reports = dial(state_file, "gateway", "fdm")
+            assert reports[0]["passed"]
+            _, restarted = dial(state_file, "resident")
+            assert restarted == [{"idle_display": "INFOLINE", "version": 3, "launch_extension": "6501"}]
+            with terminal(resident_state=state_file) as call:
+                call.display("COINLINE INFOLINE")
         finally:
             original = prior.json()["value"]
             current = client.get("/features").raise_for_status()
             client.put("/features", headers={"If-Match": current.headers["etag"]},
                        json={"text": original.get("text", "RESIDENT LAB"),
-                             "version": original.get("version", 1), "approved": False}).raise_for_status()
+                             "version": original.get("version", 1), "launcher": original.get("launcher", False),
+                             "approved": False}).raise_for_status()
     print("Verified resident download acceptance, wire order, one-use approval and restart persistence over SIP.")
 
 

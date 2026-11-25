@@ -23,6 +23,9 @@ ARGUMENTS = {
     "market.quote": ({"instrument"}, set()),
     "lottery.draw": ({"game"}, {"draw_date"}),
     "assistant.answer": ({"question"}, set()),
+    "airport.arrivals": ({"airport"}, set()),
+    "airport.departures": ({"airport"}, set()),
+    "directory.lookup": ({"number"}, set()),
 }
 OUTPUTS = {
     "weather.current": {"place", "temperatureText", "localTime", "displayTitle", "source"},
@@ -31,6 +34,9 @@ OUTPUTS = {
     "market.quote": {"symbol", "priceText", "localTime", "delay", "displayTitle", "source"},
     "lottery.draw": {"game", "drawDate", "numbers", "bonus", "displayTitle", "source"},
     "assistant.answer": {"answer", "source", "displayTitle"},
+    **{operation: {"displayTitle", "direction", "source", "updated", *(f"flight{i}" for i in range(1, 6))}
+       for operation in ("airport.arrivals", "airport.departures")},
+    "directory.lookup": {"name", "number", "detail", "source", "displayTitle"},
 }
 
 
@@ -191,7 +197,9 @@ class Session:
             result = None
             if arguments is not None:
                 try:
-                    async with asyncio.timeout(5 if current["operation"] == "assistant.answer" else provider_timeout):
+                    timeout = (12 if current["operation"].startswith("airport.") else
+                               5 if current["operation"] == "assistant.answer" else provider_timeout)
+                    async with asyncio.timeout(timeout):
                         result = await lookup(current["operation"], arguments)
                 except TimeoutError:
                     pass

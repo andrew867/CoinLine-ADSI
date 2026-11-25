@@ -175,7 +175,10 @@
             "news.headlines",
             "market.quote",
             "lottery.draw",
-            "assistant.answer"
+            "assistant.answer",
+            "airport.arrivals",
+            "airport.departures",
+            "directory.lookup"
           ]
         },
         "args": {

@@ -26,6 +26,7 @@ type Simulation = {
   page?: number; pageCount?: number; ended: boolean; trace: string[];
 };
 type Settings = { value: Record<string, unknown>; generation: number };
+type Feature = { text: string; version: number; approved: boolean; launcher: boolean; sha256?: string };
 type Route = { name: string; revision_id: string | null };
 type Telephony = { ready: boolean; active: number };
 type Point = { x: number; y: number };
@@ -33,6 +34,7 @@ type Point = { x: number; y: number };
 const operations: Record<string, string> = {
   "weather.current": "site", "weather.forecast": "site", "news.headlines": "topic",
   "market.quote": "instrument", "lottery.draw": "game", "assistant.answer": "question",
+  "airport.arrivals": "airport", "airport.departures": "airport", "directory.lookup": "number",
 };
 const titles = { menu: "Menu", message: "Screen", provider: "Data", end: "End call" };
 
@@ -76,6 +78,8 @@ function App() {
   const [fault, setFault] = useState("");
   const [settings, setSettings] = useState<Settings>();
   const [configuration, setConfiguration] = useState("");
+  const [feature, setFeature] = useState<Feature>({ text: "INFOLINE", version: 1, approved: false, launcher: true });
+  const [featureGeneration, setFeatureGeneration] = useState(0);
   const [routes, setRoutes] = useState<Route[]>([]);
   const [telephony, setTelephony] = useState<Telephony>();
   const [busy, setBusy] = useState(false);
@@ -146,11 +150,14 @@ function App() {
     if (stage) setStage(await api(`/simulations/${stage.id}/events`, "POST", event));
   }
   async function showSetup() {
-    const [config, routeList, gateway] = await Promise.all([
+    const [config, routeList, gateway, resident] = await Promise.all([
       api<Settings>("/providers"), api<Route[]>("/routes"), api<Telephony>("/telephony/status"),
+      api<{ value: Partial<Feature>; generation: number }>("/features"),
     ]);
     setSettings(config); setConfiguration(JSON.stringify(config.value, null, 2)); setRoutes(routeList);
     setTelephony(gateway); setPage("setup");
+    setFeature({ text: "INFOLINE", version: 1, approved: false, launcher: true, ...resident.value });
+    setFeatureGeneration(resident.generation);
   }
 
   if (!authenticated) return <main className="login">
@@ -198,6 +205,19 @@ function App() {
             setSettings({ value, generation: result.generation }); setStatus("Configuration saved.");
           })}>Apply</button>
         </div>
+      </section>
+      <section className="panel"><h2>Resident feature download</h2>
+        <p>Disposable test slot CL01. An approval permits one download call to 6503.</p>
+        <label>Idle display<input value={feature.text} maxLength={20} onChange={(e) => setFeature({ ...feature, text: e.target.value })} /></label>
+        <label>Feature version<input type="number" min={1} max={255} value={feature.version} onChange={(e) => setFeature({ ...feature, version: Number(e.target.value) })} /></label>
+        <label><input type="checkbox" checked={feature.launcher} onChange={(e) => setFeature({ ...feature, launcher: e.target.checked })} /> Info softkey dials InfoLine (6501)</label>
+        <label><input type="checkbox" checked={feature.approved} onChange={(e) => setFeature({ ...feature, approved: e.target.checked })} /> Approve next download</label>
+        <button disabled={busy} onClick={() => void action(async () => {
+          const { text, version, approved, launcher } = feature;
+          await api("/features", "PUT", { text, version, approved, launcher }, featureGeneration);
+          await showSetup(); setStatus("Resident feature configuration saved.");
+        })}>Save resident feature</button>
+        {feature.sha256 && <p>Artifact SHA-256: <code>{feature.sha256}</code></p>}
       </section>
     </main>}
     {page === "apps" && <main className="workspace">

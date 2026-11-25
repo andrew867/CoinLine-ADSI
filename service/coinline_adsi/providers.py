@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from defusedxml import ElementTree
 
-from . import graph, livefeeds, wire
+from . import directory, flights, graph, livefeeds, wire
 from .assistant import InformationDesk
 from .link import Link
 from .regional import Regional
@@ -34,6 +34,10 @@ def prefix(number: str | None) -> str | None:
 def fixture(operation, args, fault=None):
     if fault == "unavailable":
         return None
+    if operation.startswith("airport."):
+        return flights.fixture(operation, args.get("airport", "YYT"))
+    if operation == "directory.lookup":
+        return directory.lookup({}, args.get("number", "selected"))
     if operation == "weather.current":
         case = 1 if fault == "stale" else 0
         with (FIXTURE_ROOT / "providers/weather.json").open(encoding="utf-8") as source:
@@ -56,8 +60,12 @@ def fixture(operation, args, fault=None):
 
 
 def check_config(config: dict) -> None:
-    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional"}:
+    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional", "flights", "directory"}:
         raise ValueError("Unknown provider configuration field.")
+    if type(config.get("flights", False)) is not bool:
+        raise ValueError("Flights configuration is a boolean.")
+    if "directory" in config:
+        directory.validate(config["directory"])
     if type(config.get("regional", True)) is not bool:
         raise ValueError("Regional configuration is a boolean.")
     sites = config.get("sites", {})
@@ -115,6 +123,7 @@ class Providers:
     def __init__(self):
         self.client = httpx.AsyncClient(follow_redirects=False, trust_env=False, timeout=1.5)
         self.desk = InformationDesk(self.client)
+        self.flights = flights.Flights(self.client)
         self.weather_cache = {}
         self.weather_refresh = asyncio.Lock()
         self.regional = Regional() if os.getenv("ADSI_REGIONAL_ENABLE") == "1" else None
@@ -155,6 +164,10 @@ class Providers:
     async def lookup(self, config, operation, args, province=None):
         required, _ = graph.ARGUMENTS[operation]
         key = args[next(iter(required))]
+        if operation.startswith("airport."):
+            return await self.flights.lookup(operation, key, config.get("flights", False))
+        if operation == "directory.lookup":
+            return directory.lookup(config, key)
         if operation.startswith("weather.") and key in config.get("sites", {}):
             return await self._weather_result(operation, config["sites"][key])
         if operation == "assistant.answer":

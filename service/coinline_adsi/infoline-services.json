@@ -1,0 +1,1168 @@
+{
+  "schemaVersion": 1,
+  "entry": "welcome",
+  "nodes": [
+    {
+      "id": "welcome",
+      "type": "menu",
+      "lines": [
+        "COINLINE INFOLINE",
+        "1 News     2 Wx",
+        "3 Finance  4 Lotto",
+        "5 More     0 Exit"
+      ],
+      "prompt": "CoinLine InfoLine. Press one for news, two for weather, three for finance, four for lottery, five for more services, or zero to exit.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "News",
+          "target": "news"
+        },
+        {
+          "digit": "2",
+          "label": "Wx",
+          "target": "weather-menu"
+        },
+        {
+          "digit": "3",
+          "label": "Finance",
+          "target": "finance"
+        },
+        {
+          "digit": "4",
+          "label": "Lotto",
+          "target": "lottery-menu"
+        },
+        {
+          "digit": "5",
+          "label": "More",
+          "target": "services"
+        },
+        {
+          "digit": "0",
+          "label": "Exit",
+          "target": "end"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "news",
+      "type": "menu",
+      "lines": [
+        "NEWS",
+        "1 Top      2 World",
+        "3 Canada   4 Local",
+        "5 More     0 Back"
+      ],
+      "prompt": "News. Press one for top stories, two for world, three for Canada, four for local, five for more topics, zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Top",
+          "target": "topstories"
+        },
+        {
+          "digit": "2",
+          "label": "World",
+          "target": "world"
+        },
+        {
+          "digit": "3",
+          "label": "Canada",
+          "target": "canada"
+        },
+        {
+          "digit": "4",
+          "label": "Local",
+          "target": "local"
+        },
+        {
+          "digit": "5",
+          "label": "More",
+          "target": "news-more"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "welcome"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "news-more",
+      "type": "menu",
+      "lines": [
+        "NEWS TOPICS",
+        "1 Politics 2 Health",
+        "3 Arts     4 Tech",
+        "5 More     0 Back"
+      ],
+      "prompt": "Press one for politics, two for health, three for arts, four for technology, five for more, zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Politics",
+          "target": "politics"
+        },
+        {
+          "digit": "2",
+          "label": "Health",
+          "target": "health"
+        },
+        {
+          "digit": "3",
+          "label": "Arts",
+          "target": "arts"
+        },
+        {
+          "digit": "4",
+          "label": "Tech",
+          "target": "technology"
+        },
+        {
+          "digit": "5",
+          "label": "More",
+          "target": "news-other"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "news"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "news-other",
+      "type": "menu",
+      "lines": [
+        "MORE NEWS",
+        "1 Sports   2 Global",
+        "3 NTV      4 VOCM",
+        "0 Back"
+      ],
+      "prompt": "Press one for sports, two for Global News, three for NTV, four for VOCM, zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Sports",
+          "target": "sports"
+        },
+        {
+          "digit": "2",
+          "label": "Global",
+          "target": "global"
+        },
+        {
+          "digit": "3",
+          "label": "NTV",
+          "target": "ntv"
+        },
+        {
+          "digit": "4",
+          "label": "VOCM",
+          "target": "vocm"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "news-more"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "topstories",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "topstories"
+      },
+      "bind": "topstories",
+      "onOk": "topstories-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "topstories-result",
+      "type": "message",
+      "lines": [
+        "{{topstories.displayTitle}}",
+        "{{topstories.headline}}",
+        "{{topstories.localTime}}",
+        "{{topstories.source}}"
+      ],
+      "prompt": "{{topstories.displayTitle}}. {{topstories.headline}}. {{topstories.localTime}}. {{topstories.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "world",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "world"
+      },
+      "bind": "world",
+      "onOk": "world-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "world-result",
+      "type": "message",
+      "lines": [
+        "{{world.displayTitle}}",
+        "{{world.headline}}",
+        "{{world.localTime}}",
+        "{{world.source}}"
+      ],
+      "prompt": "{{world.displayTitle}}. {{world.headline}}. {{world.localTime}}. {{world.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "canada",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "canada"
+      },
+      "bind": "canada",
+      "onOk": "canada-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "canada-result",
+      "type": "message",
+      "lines": [
+        "{{canada.displayTitle}}",
+        "{{canada.headline}}",
+        "{{canada.localTime}}",
+        "{{canada.source}}"
+      ],
+      "prompt": "{{canada.displayTitle}}. {{canada.headline}}. {{canada.localTime}}. {{canada.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "local",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "local"
+      },
+      "bind": "local",
+      "onOk": "local-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "local-result",
+      "type": "message",
+      "lines": [
+        "{{local.displayTitle}}",
+        "{{local.headline}}",
+        "{{local.localTime}}",
+        "{{local.source}}"
+      ],
+      "prompt": "{{local.displayTitle}}. {{local.headline}}. {{local.localTime}}. {{local.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "politics",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "politics"
+      },
+      "bind": "politics",
+      "onOk": "politics-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "politics-result",
+      "type": "message",
+      "lines": [
+        "{{politics.displayTitle}}",
+        "{{politics.headline}}",
+        "{{politics.localTime}}",
+        "{{politics.source}}"
+      ],
+      "prompt": "{{politics.displayTitle}}. {{politics.headline}}. {{politics.localTime}}. {{politics.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-more"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "health",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "health"
+      },
+      "bind": "health",
+      "onOk": "health-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "health-result",
+      "type": "message",
+      "lines": [
+        "{{health.displayTitle}}",
+        "{{health.headline}}",
+        "{{health.localTime}}",
+        "{{health.source}}"
+      ],
+      "prompt": "{{health.displayTitle}}. {{health.headline}}. {{health.localTime}}. {{health.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-more"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "arts",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "arts"
+      },
+      "bind": "arts",
+      "onOk": "arts-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "arts-result",
+      "type": "message",
+      "lines": [
+        "{{arts.displayTitle}}",
+        "{{arts.headline}}",
+        "{{arts.localTime}}",
+        "{{arts.source}}"
+      ],
+      "prompt": "{{arts.displayTitle}}. {{arts.headline}}. {{arts.localTime}}. {{arts.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-more"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "technology",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "technology"
+      },
+      "bind": "technology",
+      "onOk": "technology-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "technology-result",
+      "type": "message",
+      "lines": [
+        "{{technology.displayTitle}}",
+        "{{technology.headline}}",
+        "{{technology.localTime}}",
+        "{{technology.source}}"
+      ],
+      "prompt": "{{technology.displayTitle}}. {{technology.headline}}. {{technology.localTime}}. {{technology.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-more"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "sports",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "sports"
+      },
+      "bind": "sports",
+      "onOk": "sports-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "sports-result",
+      "type": "message",
+      "lines": [
+        "{{sports.displayTitle}}",
+        "{{sports.headline}}",
+        "{{sports.localTime}}",
+        "{{sports.source}}"
+      ],
+      "prompt": "{{sports.displayTitle}}. {{sports.headline}}. {{sports.localTime}}. {{sports.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-other"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "global",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "global"
+      },
+      "bind": "global",
+      "onOk": "global-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "global-result",
+      "type": "message",
+      "lines": [
+        "{{global.displayTitle}}",
+        "{{global.headline}}",
+        "{{global.localTime}}",
+        "{{global.source}}"
+      ],
+      "prompt": "{{global.displayTitle}}. {{global.headline}}. {{global.localTime}}. {{global.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-other"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "ntv",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "ntv"
+      },
+      "bind": "ntv",
+      "onOk": "ntv-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "ntv-result",
+      "type": "message",
+      "lines": [
+        "{{ntv.displayTitle}}",
+        "{{ntv.headline}}",
+        "{{ntv.localTime}}",
+        "{{ntv.source}}"
+      ],
+      "prompt": "{{ntv.displayTitle}}. {{ntv.headline}}. {{ntv.localTime}}. {{ntv.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-other"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "vocm",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "vocm"
+      },
+      "bind": "vocm",
+      "onOk": "vocm-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "vocm-result",
+      "type": "message",
+      "lines": [
+        "{{vocm.displayTitle}}",
+        "{{vocm.headline}}",
+        "{{vocm.localTime}}",
+        "{{vocm.source}}"
+      ],
+      "prompt": "{{vocm.displayTitle}}. {{vocm.headline}}. {{vocm.localTime}}. {{vocm.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "news-other"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "financial",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "financial"
+      },
+      "bind": "financial",
+      "onOk": "financial-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "financial-result",
+      "type": "message",
+      "lines": [
+        "{{financial.displayTitle}}",
+        "{{financial.headline}}",
+        "{{financial.localTime}}",
+        "{{financial.source}}"
+      ],
+      "prompt": "{{financial.displayTitle}}. {{financial.headline}}. {{financial.localTime}}. {{financial.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "finance"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "biotech",
+      "type": "provider",
+      "operation": "news.headlines",
+      "args": {
+        "topic": "biotech"
+      },
+      "bind": "biotech",
+      "onOk": "biotech-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "biotech-result",
+      "type": "message",
+      "lines": [
+        "{{biotech.displayTitle}}",
+        "{{biotech.headline}}",
+        "{{biotech.localTime}}",
+        "{{biotech.source}}"
+      ],
+      "prompt": "{{biotech.displayTitle}}. {{biotech.headline}}. {{biotech.localTime}}. {{biotech.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "finance"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "weather-menu",
+      "type": "menu",
+      "lines": [
+        "WEATHER",
+        "1 Conditions",
+        "2 Forecast",
+        "0 Back"
+      ],
+      "prompt": "Press one for current weather, two for the forecast, or zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Current",
+          "target": "weather"
+        },
+        {
+          "digit": "2",
+          "label": "Forecast",
+          "target": "forecast"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "welcome"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "weather",
+      "type": "provider",
+      "operation": "weather.current",
+      "args": {
+        "site": "selected"
+      },
+      "bind": "weather",
+      "onOk": "weather-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "weather-result",
+      "type": "message",
+      "lines": [
+        "{{weather.displayTitle}}",
+        "{{weather.place}}",
+        "{{weather.temperatureText}}",
+        "{{weather.localTime}}"
+      ],
+      "prompt": "{{weather.displayTitle}}. {{weather.place}}. {{weather.temperatureText}}. {{weather.localTime}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "weather-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "forecast",
+      "type": "provider",
+      "operation": "weather.forecast",
+      "args": {
+        "site": "selected"
+      },
+      "bind": "forecast",
+      "onOk": "forecast-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "forecast-result",
+      "type": "message",
+      "lines": [
+        "{{forecast.displayTitle}}",
+        "{{forecast.place}}",
+        "{{forecast.forecast}}",
+        "{{forecast.source}}"
+      ],
+      "prompt": "{{forecast.displayTitle}}. {{forecast.place}}. {{forecast.forecast}}. {{forecast.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "weather-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "finance",
+      "type": "menu",
+      "lines": [
+        "FINANCE",
+        "1 Stocks   2 FinNews",
+        "3 Biotech  4 Banking",
+        "0 Back"
+      ],
+      "prompt": "Finance. Press one for stocks, two for financial news, three for biotech news, four for banking, or zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Stocks",
+          "target": "stocks"
+        },
+        {
+          "digit": "2",
+          "label": "FinNews",
+          "target": "financial"
+        },
+        {
+          "digit": "3",
+          "label": "Biotech",
+          "target": "biotech"
+        },
+        {
+          "digit": "4",
+          "label": "Banking",
+          "target": "banking"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "welcome"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "stocks",
+      "type": "provider",
+      "operation": "market.quote",
+      "args": {
+        "instrument": "selected"
+      },
+      "bind": "stocks",
+      "onOk": "stocks-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "stocks-result",
+      "type": "message",
+      "lines": [
+        "{{stocks.displayTitle}}",
+        "{{stocks.symbol}} {{stocks.priceText}}",
+        "{{stocks.delay}}",
+        "{{stocks.localTime}}",
+        "{{stocks.source}}"
+      ],
+      "prompt": "{{stocks.displayTitle}}. {{stocks.symbol}} {{stocks.priceText}}. {{stocks.delay}}. {{stocks.localTime}}. {{stocks.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "finance"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "banking",
+      "type": "menu",
+      "lines": [
+        "BANKING",
+        "1 Demo account",
+        "2 Private account",
+        "0 Back"
+      ],
+      "prompt": "Banking. Press one for demo balance and transactions, two for private account access, or zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Demo",
+          "target": "bank-demo"
+        },
+        {
+          "digit": "2",
+          "label": "Private",
+          "target": "bank-private"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "finance"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "bank-demo",
+      "type": "end",
+      "action": "balance-demo",
+      "prompt": "Open the demo balance service."
+    },
+    {
+      "id": "bank-private",
+      "type": "end",
+      "action": "private-balance",
+      "prompt": "Open the private account service."
+    },
+    {
+      "id": "lottery-menu",
+      "type": "menu",
+      "lines": [
+        "LOTTERY RESULTS",
+        "1 Lotto Max 2 6/49",
+        "3 Daily G   4 Local",
+        "0 Back"
+      ],
+      "prompt": "Press one for Lotto Max, two for Lotto six forty-nine, three for Daily Grand, four for regional games, or zero to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Max",
+          "target": "lottomax"
+        },
+        {
+          "digit": "2",
+          "label": "6/49",
+          "target": "lotto649"
+        },
+        {
+          "digit": "3",
+          "label": "Daily G",
+          "target": "dailygrand"
+        },
+        {
+          "digit": "4",
+          "label": "Local",
+          "target": "regional-draw"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "welcome"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "lottomax",
+      "type": "provider",
+      "operation": "lottery.draw",
+      "args": {
+        "game": "max"
+      },
+      "bind": "lottomax",
+      "onOk": "lottomax-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "lottomax-result",
+      "type": "message",
+      "lines": [
+        "{{lottomax.game}}",
+        "{{lottomax.drawDate}}",
+        "{{lottomax.numbers}}",
+        "{{lottomax.bonus}}",
+        "{{lottomax.source}}"
+      ],
+      "prompt": "{{lottomax.game}}. {{lottomax.drawDate}}. {{lottomax.numbers}}. {{lottomax.bonus}}. {{lottomax.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "lottery-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "lotto649",
+      "type": "provider",
+      "operation": "lottery.draw",
+      "args": {
+        "game": "649"
+      },
+      "bind": "lotto649",
+      "onOk": "lotto649-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "lotto649-result",
+      "type": "message",
+      "lines": [
+        "{{lotto649.game}}",
+        "{{lotto649.drawDate}}",
+        "{{lotto649.numbers}}",
+        "{{lotto649.bonus}}",
+        "{{lotto649.source}}"
+      ],
+      "prompt": "{{lotto649.game}}. {{lotto649.drawDate}}. {{lotto649.numbers}}. {{lotto649.bonus}}. {{lotto649.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "lottery-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "dailygrand",
+      "type": "provider",
+      "operation": "lottery.draw",
+      "args": {
+        "game": "daily-grand"
+      },
+      "bind": "dailygrand",
+      "onOk": "dailygrand-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "dailygrand-result",
+      "type": "message",
+      "lines": [
+        "{{dailygrand.game}}",
+        "{{dailygrand.drawDate}}",
+        "{{dailygrand.numbers}}",
+        "{{dailygrand.bonus}}",
+        "{{dailygrand.source}}"
+      ],
+      "prompt": "{{dailygrand.game}}. {{dailygrand.drawDate}}. {{dailygrand.numbers}}. {{dailygrand.bonus}}. {{dailygrand.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "lottery-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "regional-draw",
+      "type": "provider",
+      "operation": "lottery.draw",
+      "args": {
+        "game": "regional"
+      },
+      "bind": "regional-draw",
+      "onOk": "regional-draw-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "regional-draw-result",
+      "type": "message",
+      "lines": [
+        "{{regional-draw.game}}",
+        "{{regional-draw.drawDate}}",
+        "{{regional-draw.numbers}}",
+        "{{regional-draw.bonus}}",
+        "{{regional-draw.source}}"
+      ],
+      "prompt": "{{regional-draw.game}}. {{regional-draw.drawDate}}. {{regional-draw.numbers}}. {{regional-draw.bonus}}. {{regional-draw.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "lottery-menu"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "help",
+      "type": "provider",
+      "operation": "assistant.answer",
+      "args": {
+        "question": "adsi"
+      },
+      "bind": "help",
+      "onOk": "help-result",
+      "onUnavailable": "unavailable"
+    },
+    {
+      "id": "help-result",
+      "type": "message",
+      "lines": [
+        "{{help.displayTitle}}",
+        "{{help.answer}}",
+        "{{help.source}}"
+      ],
+      "prompt": "{{help.displayTitle}}. {{help.answer}}. {{help.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "unavailable",
+      "type": "message",
+      "lines": [
+        "SERVICE UNAVAILABLE",
+        "0 Back"
+      ],
+      "prompt": "This service is unavailable. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "welcome"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "end",
+      "type": "end",
+      "prompt": "Goodbye."
+    },
+    {
+      "id": "services",
+      "type": "menu",
+      "lines": [
+        "MORE SERVICES",
+        "1 Flights  2 Dir",
+        "3 Ask      0 Back"
+      ],
+      "prompt": "More services. Press 1 for flights, 2 for directory, 3 for information, or 0 to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Flights",
+          "target": "flights"
+        },
+        {
+          "digit": "2",
+          "label": "Directory",
+          "target": "directory-fetch"
+        },
+        {
+          "digit": "3",
+          "label": "Ask",
+          "target": "help"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "welcome"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "flights",
+      "type": "menu",
+      "lines": [
+        "AIRPORT BOARDS",
+        "1 Arrivals",
+        "2 Departures",
+        "0 Back"
+      ],
+      "prompt": "Airport boards. Press 1 for arrivals, 2 for departures, or 0 to return.",
+      "choices": [
+        {
+          "digit": "1",
+          "label": "Arrivals",
+          "target": "arrivals-fetch"
+        },
+        {
+          "digit": "2",
+          "label": "Departures",
+          "target": "departures-fetch"
+        },
+        {
+          "digit": "0",
+          "label": "Back",
+          "target": "services"
+        }
+      ],
+      "onTimeout": "end"
+    },
+    {
+      "id": "flights-unavailable",
+      "type": "message",
+      "lines": [
+        "BOARD UNAVAILABLE",
+        "0 Back"
+      ],
+      "prompt": "Flight information is unavailable, or airport selection was cancelled. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "flights"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "directory-fetch",
+      "type": "provider",
+      "operation": "directory.lookup",
+      "args": {
+        "number": "selected"
+      },
+      "bind": "directory-fetch",
+      "onOk": "directory-result",
+      "onUnavailable": "directory-unavailable"
+    },
+    {
+      "id": "directory-result",
+      "type": "message",
+      "lines": [
+        "{{directory-fetch.displayTitle}}",
+        "{{directory-fetch.name}}",
+        "{{directory-fetch.number}}",
+        "{{directory-fetch.detail}}",
+        "{{directory-fetch.source}}"
+      ],
+      "prompt": "{{directory-fetch.name}}. Number {{directory-fetch.number}}. {{directory-fetch.detail}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "services"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "directory-unavailable",
+      "type": "message",
+      "lines": [
+        "NO DIRECTORY RESULT",
+        "0 Back"
+      ],
+      "prompt": "No directory entry selected. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "services"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "arrivals-fetch",
+      "type": "provider",
+      "operation": "airport.arrivals",
+      "args": {
+        "airport": "selected"
+      },
+      "bind": "arrivals-fetch",
+      "onOk": "arrivals-result",
+      "onUnavailable": "flights-unavailable"
+    },
+    {
+      "id": "arrivals-result",
+      "type": "message",
+      "lines": [
+        "{{arrivals-fetch.displayTitle}}",
+        "{{arrivals-fetch.direction}}",
+        "{{arrivals-fetch.flight1}}",
+        "{{arrivals-fetch.flight2}}",
+        "{{arrivals-fetch.flight3}}",
+        "{{arrivals-fetch.flight4}}",
+        "{{arrivals-fetch.flight5}}",
+        "{{arrivals-fetch.updated}}",
+        "{{arrivals-fetch.source}}",
+        "SCH scheduled",
+        "AIR airborne",
+        "LND landed",
+        "DLY delayed",
+        "CXL cancelled",
+        "DIV diverted",
+        "INC incident",
+        "UNK unknown"
+      ],
+      "prompt": "Airport arrivals. {{arrivals-fetch.flight1}} {{arrivals-fetch.flight2}} {{arrivals-fetch.flight3}} {{arrivals-fetch.flight4}} {{arrivals-fetch.flight5}}. {{arrivals-fetch.updated}}. {{arrivals-fetch.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "flights"
+      },
+      "onTimeout": "end"
+    },
+    {
+      "id": "departures-fetch",
+      "type": "provider",
+      "operation": "airport.departures",
+      "args": {
+        "airport": "selected"
+      },
+      "bind": "departures-fetch",
+      "onOk": "departures-result",
+      "onUnavailable": "flights-unavailable"
+    },
+    {
+      "id": "departures-result",
+      "type": "message",
+      "lines": [
+        "{{departures-fetch.displayTitle}}",
+        "{{departures-fetch.direction}}",
+        "{{departures-fetch.flight1}}",
+        "{{departures-fetch.flight2}}",
+        "{{departures-fetch.flight3}}",
+        "{{departures-fetch.flight4}}",
+        "{{departures-fetch.flight5}}",
+        "{{departures-fetch.updated}}",
+        "{{departures-fetch.source}}",
+        "SCH scheduled",
+        "AIR airborne",
+        "LND landed",
+        "DLY delayed",
+        "CXL cancelled",
+        "DIV diverted",
+        "INC incident",
+        "UNK unknown"
+      ],
+      "prompt": "Airport departures. {{departures-fetch.flight1}} {{departures-fetch.flight2}} {{departures-fetch.flight3}} {{departures-fetch.flight4}} {{departures-fetch.flight5}}. {{departures-fetch.updated}}. {{departures-fetch.source}}. Press zero to return.",
+      "continue": {
+        "digit": "0",
+        "label": "Back",
+        "target": "flights"
+      },
+      "onTimeout": "end"
+    }
+  ]
+}

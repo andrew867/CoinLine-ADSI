@@ -33,6 +33,7 @@ Open the operator console at `http://127.0.0.1:8080` and sign in with the genera
 | [Packaging and delivery](docs/plan/operations.md) | Compose topology, operations, repository split and GitHub Actions |
 | [Run the lab](docs/plan/running.md) | Build, provision and test the local service, console and emulator |
 | [Extra InfoLine services](docs/plan/extra-services.md) | Airport keypad search, flight boards, directory, optional native voicemail and resident launcher |
+| [CoinLine-emu PSTN integration handoff](docs/plan/millennium-interop.md) | Dedicated 2374 SIP ingress, simulator routing, PCM contract and acceptance gates |
 | [Local lab results](docs/status/local-lab.md) | Verified exchanges, recovery drills and qualification status |
 | [Canadian InfoLine lab results](docs/status/regional-lab.md) | Provider responses, caller ID, finance and regional lottery verification |
 | [Fixtures](fixtures/README.md) | Synthetic wire vectors, application graph and provider examples |

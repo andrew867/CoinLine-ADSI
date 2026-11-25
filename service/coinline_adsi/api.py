@@ -288,7 +288,11 @@ async def routes(store=Depends(database)):
 @api.get("/telephony/status")
 async def telephony_status(request: Request):
     gateway = request.app.state.gateway
-    return gateway.status() if gateway else {"ready": False, "active": 0}
+    status = gateway.status() if gateway else {"ready": False, "active": 0}
+    if gateway and os.getenv("ADSI_EMU_ENABLE") == "1":
+        status["emulatorIngress"] = {"uri": "sip:2374@127.0.0.1:5069", "fromUser": "co",
+                                     "firstAlertMs": round(gateway.first_alert_delay("emu-infoline") * 1000)}
+    return status
 
 
 @api.get("/profiles")

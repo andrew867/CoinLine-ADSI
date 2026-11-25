@@ -47,7 +47,7 @@ class BalanceTests(unittest.IsolatedAsyncioTestCase):
                 "connection": "fixture-connection"}).encode()))
             screens, digits = [], []
             class FixtureLink:
-                data_mode = True
+                display_active = True
                 released = False
                 async def transfer(self, data, **kwargs):
                     screens.append(data)

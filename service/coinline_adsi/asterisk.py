@@ -18,7 +18,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from . import audio
-from .link import LAB_PROMPTS, Link, LinkFailure
+from .link import CONTINUOUS_DATA, LAB_PROMPTS, PROFILES, Link, LinkFailure
 
 
 LOG = logging.getLogger(__name__)
@@ -85,15 +85,18 @@ CallHandler = Callable[[str, str | None, Link, Callable[[str], Awaitable[None]]]
 
 class Gateway:
     def __init__(self, base: str, password: str, handler: CallHandler, limit: int = 10,
-                 emu_alert_delay: float = 1.0):
+                 emu_alert_delay: float = 1.0, emu_interaction_profile: str = CONTINUOUS_DATA):
         if not 0.25 <= emu_alert_delay <= 5.0:
             raise ValueError("Emulator first-alert delay must be 250 to 5000 ms.")
+        if emu_interaction_profile not in PROFILES:
+            raise ValueError("Unknown emulator interaction profile.")
         self.base = base.rstrip("/")
         self.authorization = "Basic " + base64.b64encode(f"{APP}:{password}".encode()).decode()
         self.http = httpx.AsyncClient(base_url=self.base + "/ari/", auth=(APP, password), timeout=2, trust_env=False)
         self.handler = handler
         self.limit = limit
         self.emu_alert_delay = emu_alert_delay
+        self.emu_interaction_profile = emu_interaction_profile
         self.connected = False
         self.calls: dict[str, Admission] = {}
         self.pending: dict[str, Admission] = {}
@@ -103,6 +106,9 @@ class Gateway:
 
     def first_alert_delay(self, route: str) -> float:
         return self.emu_alert_delay if route == "emu-infoline" else 0.25
+
+    def interaction_profile(self, route: str) -> str:
+        return self.emu_interaction_profile if route == "emu-infoline" else CONTINUOUS_DATA
 
     def status(self):
         samples = sorted(list(self.latencies)[-100:])
@@ -191,7 +197,8 @@ class Gateway:
             # Let the newly bridged RTP leg start delivering media before CAS.
             await asyncio.sleep(self.first_alert_delay(route))
             stage = "application"
-            call.link = Link(media.play, observe=self.latencies.append if route == "lab" else None)
+            call.link = Link(media.play, observe=self.latencies.append if route == "lab" else None,
+                             profile=self.interaction_profile(route))
 
             async def say(text):
                 pcm = self.lab_audio.get(text) if route == "lab" else None

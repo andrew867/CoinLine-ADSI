@@ -15,6 +15,19 @@ std::vector<uint8_t> packet(uint8_t kind, uint8_t tag, std::vector<uint8_t> payl
 
 int main()
 {
+    Terminal mixed;
+    assert(mixed.apply(packet(0x84, 0x8e, {})));
+    assert(mixed.apply(packet(0x84, 0x86, {})));
+    assert(mixed.sessionOpen() && mixed.inDataMode());
+    assert(mixed.apply(packet(0x84, 0x84, {0xf4, 0})));
+    assert((mixed.informationFlags() == std::array<uint8_t, 2>{0xf4, 0}));
+    assert(!mixed.apply(packet(0x84, 0x84, {0xf4})));
+    assert(mixed.apply(packet(0x84, 0x87, {0})));
+    assert(mixed.sessionOpen() && !mixed.inDataMode() && !mixed.released());
+    assert(mixed.apply(packet(0x84, 0x85, {})));
+    assert(mixed.apply(packet(0x84, 0x87, {0})));
+    assert(!mixed.sessionOpen() && mixed.released());
+
     Terminal terminal(true);
     const std::vector<uint8_t> lab {0x84, 0x0d, 0x01, 0x82, 0x07, 0x01, 0x40, 0xff, 0x4c, 0x41,
                                    0x42, 0xff, 0x83, 0x01, 0x01, 0x52};

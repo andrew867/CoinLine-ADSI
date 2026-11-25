@@ -24,7 +24,7 @@ def heading(title, query, count):
 
 
 async def _screen(link, say, lines, choices, prompt):
-    if link.data_mode:
+    if link.display_active:
         await link.transfer(wire.screen([graph.handset_text(line)[:20] for line in lines], choices), open_input=True)
     else:
         link.open_voice_input()

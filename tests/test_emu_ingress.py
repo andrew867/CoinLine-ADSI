@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 from coinline_adsi.asterisk import Gateway
+from coinline_adsi.link import CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +12,18 @@ CONFIG = ROOT / 'deploy/asterisk/config'
 
 
 class EmulatorIngressTests(unittest.IsolatedAsyncioTestCase):
+    async def test_voice_profile_is_opt_in_and_route_scoped(self):
+        gateway = Gateway('http://example.test', 'synthetic', AsyncMock(),
+                          emu_interaction_profile=VOICE_BETWEEN_SCREENS)
+        try:
+            self.assertEqual(gateway.interaction_profile('emu-infoline'), VOICE_BETWEEN_SCREENS)
+            for route in ('infoline', 'lab', 'resident-lab', 'private-lab-infoline'):
+                self.assertEqual(gateway.interaction_profile(route), CONTINUOUS_DATA)
+        finally:
+            await gateway.http.aclose()
+        with self.assertRaises(ValueError):
+            Gateway('http://example.test', 'synthetic', AsyncMock(), emu_interaction_profile='invalid')
+
     async def test_delay_only_changes_emulator_alert(self):
         gateway = Gateway('http://example.test', 'synthetic', AsyncMock(), emu_alert_delay=1.25)
         try:

@@ -276,7 +276,7 @@ async def demo_balance(link: Link, say, access_code: str, *, connected=False, tr
             await link.release()
         await say("Balance demonstration unavailable.")
         return
-    display = link.data_mode if connected else await link.connect()
+    display = link.display_active if connected else await link.connect()
     if display:
         await link.transfer(wire.screen(["DEMO BALANCE", "Enter lab code"], []), open_input=True)
     else:

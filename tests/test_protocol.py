@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from coinline_adsi import audio, wire
-from coinline_adsi.link import Link, LinkFailure
+from coinline_adsi.link import Link, LinkFailure, VOICE_BETWEEN_SCREENS
 
 
 ROOT = Path(__file__).parents[1]
@@ -39,6 +39,20 @@ class WireTests(unittest.TestCase):
         mark = [sample for (sample,) in struct.iter_unpack("<h", pcm[:2400])]
         zero_crossings = sum(left < 0 <= right for left, right in zip(mark, mark[1:]))
         self.assertAlmostEqual(zero_crossings, 180, delta=1)
+
+    def test_voice_screen_and_separate_information_fixture(self):
+        voice = wire.finish_in_voice(wire.LAB)
+        self.assertEqual(voice, bytes.fromhex(
+            "84 22 01 82 07 01 40 FF 4C 41 42 FF 83 01 01 80 08 10 47 6F FF 47 6F FF 31 "
+            "81 06 10 01 01 01 01 01 87 01 00 E6"))
+        self.assertEqual(voice[3:-4], wire.LAB[3:-1])
+        flagged = wire.screen(["LAB"], [("Go", "1")], information=b"\xf4\x00")
+        self.assertEqual(flagged[-5:-1], bytes.fromhex("84 02 F4 00"))
+        self.assertEqual(sum(flagged) % 256, 0)
+        with self.assertRaises(ValueError):
+            wire.information_flags(b"\xf4")
+        with self.assertRaises(ValueError):
+            wire.finish_in_voice(wire.LAB[:-1] + b"\0")
 
 
 class LinkTests(unittest.IsolatedAsyncioTestCase):
@@ -113,3 +127,79 @@ class LinkTests(unittest.IsolatedAsyncioTestCase):
             return asyncio.get_running_loop().time()
 
         self.assertFalse(await Link(play, probe_timeout=0.005).connect())
+
+    async def test_voice_between_screens_retains_session_and_realerts(self):
+        now = asyncio.get_running_loop().time
+        responses = iter(("A", "D1", "D1B", "A", "D1", "A", "D1"))
+        played = []
+
+        async def play(pcm):
+            played.append(pcm)
+            end = now()
+            for digit in next(responses):
+                link.receive(digit, now())
+            return end
+
+        link = Link(play, profile=VOICE_BETWEEN_SCREENS)
+        self.assertTrue(await link.connect())
+        self.assertTrue(link.data_mode)
+        await link.transfer(wire.LAB, open_input=True)
+        self.assertTrue(link.display_active)
+        self.assertFalse(link.data_mode)
+        # The optional mode-change B is not application input.
+        link.receive("1", now())
+        self.assertEqual(await link.selection(0.01), "1")
+        await link.transfer(wire.OK, open_input=True)
+        self.assertTrue(link.display_active)
+        self.assertFalse(link.data_mode)
+        await link.release()
+        self.assertFalse(link.display_active)
+        self.assertFalse(link.data_mode)
+        self.assertEqual(played, [audio.cas(), audio.bell202(wire.CONNECT), audio.bell202(wire.finish_in_voice(wire.LAB)),
+                                  audio.cas(), audio.bell202(wire.finish_in_voice(wire.OK)),
+                                  audio.cas(), audio.bell202(wire.RELEASE)])
+
+    async def test_voice_profile_does_not_retry_an_uncertain_transition(self):
+        now = asyncio.get_running_loop().time
+        responses = iter(("A", "D1", "D"))
+        played = []
+
+        async def play(pcm):
+            played.append(pcm)
+            end = now()
+            for digit in next(responses):
+                link.receive(digit, now())
+            return end
+
+        link = Link(play, profile=VOICE_BETWEEN_SCREENS, reply_timeout=0.005)
+        self.assertTrue(await link.connect())
+        with self.assertRaisesRegex(LinkFailure, "unresolved"):
+            await link.transfer(wire.LAB, open_input=True)
+        for digit in "D1":
+            link.receive(digit, now())
+        with self.assertRaisesRegex(LinkFailure, "disarmed"):
+            await link.selection(0.01)
+        with self.assertRaisesRegex(LinkFailure, "unresolved"):
+            await link.transfer(wire.OK, open_input=True)
+        self.assertEqual(len(played), 3)
+
+    async def test_voice_profile_requires_fresh_capability_reply(self):
+        now = asyncio.get_running_loop().time
+        responses = iter(("A", "D1", "D1", "D1"))
+        played = []
+
+        async def play(pcm):
+            played.append(pcm)
+            end = now()
+            for digit in next(responses):
+                link.receive(digit, now())
+            return end
+
+        link = Link(play, profile=VOICE_BETWEEN_SCREENS)
+        self.assertTrue(await link.connect())
+        await link.transfer(wire.LAB, open_input=True)
+        with self.assertRaisesRegex(LinkFailure, "new alert"):
+            await link.transfer(wire.OK, open_input=True)
+        self.assertTrue(link.uncertain)
+        self.assertEqual(played[-1], audio.cas())
+        self.assertEqual(len(played), 4)

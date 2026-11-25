@@ -291,7 +291,8 @@ async def telephony_status(request: Request):
     status = gateway.status() if gateway else {"ready": False, "active": 0}
     if gateway and os.getenv("ADSI_EMU_ENABLE") == "1":
         status["emulatorIngress"] = {"uri": "sip:2374@127.0.0.1:5069", "fromUser": "co",
-                                     "firstAlertMs": round(gateway.first_alert_delay("emu-infoline") * 1000)}
+                                     "firstAlertMs": round(gateway.first_alert_delay("emu-infoline") * 1000),
+                                     "interactionProfile": gateway.interaction_profile("emu-infoline")}
     return status
 
 

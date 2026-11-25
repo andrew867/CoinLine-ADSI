@@ -462,7 +462,7 @@ async def choose(link, say, title, entries):
         if start + 2 < len(entries):
             labels.append("More")
         lines = [graph.handset_text(title)[:20], *(graph.handset_text(f"{i} {label}")[:20] for i, label in enumerate(labels, 1))]
-        if link.data_mode:
+        if link.display_active:
             await link.transfer(wire.screen(lines, [(graph.handset_text(label)[:7], str(i)) for i, label in enumerate(labels, 1)]), open_input=True)
         else:
             link.open_voice_input()

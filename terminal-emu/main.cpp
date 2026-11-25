@@ -16,6 +16,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <poll.h>
 #include <unistd.h>
@@ -45,6 +46,8 @@ class AudioPort : public pj::AudioMediaPort {
 public:
     explicit AudioPort(std::string scenario, bool attached = true, bool privateDisplay = false) : scenario_(std::move(scenario)),
                                                                   privateDisplay_(privateDisplay),
+                                                                  strictVoiceInput_(std::getenv("ADSI_TERMINAL_VOICE_INPUT_ONLY") &&
+                                                                      std::string_view(std::getenv("ADSI_TERMINAL_VOICE_INPUT_ONLY")) == "1"),
                                                                   terminal_(scenario_ == "fdm")
     {
         serial_ = async_rx_init(nullptr, 8, ASYNC_PARITY_NONE, 1, false, &receivedByte, this);
@@ -107,6 +110,9 @@ public:
     void press(const std::string &input)
     {
         std::lock_guard lock(mutex_);
+        if (strictVoiceInput_ && terminal_.inDataMode()) {
+            return;
+        }
         if (input.size() == 1 && std::string("0123456789*#ABCD").find(input[0]) != std::string::npos) {
             digit(input[0], false);
         } else if (input.size() == 2 && input[0] == 'k' && input[1] >= '1' && input[1] <= '6') {
@@ -189,15 +195,16 @@ private:
         auto cas = energy > 160 * 300.0 * 300.0 &&
             tonePower(window_, 2130) > threshold && tonePower(window_, 2750) > threshold;
         casWindows_ = cas ? casWindows_ + 1 : 0;
-        if (casWindows_ == 3 && !alert_) {
+        if (casWindows_ == 3 && !receiving_) {
             alert_ = true;
+            receiving_ = true;
             record({{"signal", "CAS"}});
             if (scenario_ != "fallback") {
                 silence(80);
                 digit('A');
             }
         }
-        if (alert_ && scenario_ != "fallback") {
+        if (receiving_ && scenario_ != "fallback") {
             fsk_rx(modem_, window_.data(), static_cast<int>(window_.size()));
         }
     }
@@ -236,6 +243,7 @@ private:
         }
         if (valid) {
             terminal_ = std::move(staged);
+            receiving_ = terminal_.inDataMode();
         }
         std::ostringstream hex;
         for (const auto byte : bytes_) {
@@ -254,7 +262,7 @@ private:
         }
         record({{"frame", hex.str()}, {"valid", valid}, {"line", terminal_.line()},
                 {"lines", terminal_.viewport()}, {"softkeys", labels},
-                {"mode", terminal_.inDataMode() ? "data" : "voice"}});
+                {"mode", terminal_.inDataMode() ? "data" : "voice"}, {"session", terminal_.sessionOpen()}});
         if (valid) {
             if (terminal_.released() && !releaseSample_) {
                 releaseSample_ = samples_;
@@ -295,6 +303,7 @@ private:
     std::mutex mutex_;
     const std::string scenario_;
     const bool privateDisplay_;
+    const bool strictVoiceInput_;
     Terminal terminal_;
     async_rx_state_t *serial_;
     fsk_rx_state_t *modem_;
@@ -307,6 +316,7 @@ private:
     unsigned releaseSample_ = 0;
     unsigned waitForReply_ = 0;
     bool alert_ = false;
+    bool receiving_ = false;
     bool lab_ = false;
     bool ok_ = false;
     bool keySent_ = false;

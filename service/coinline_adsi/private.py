@@ -171,7 +171,7 @@ class PrivateBalances:
             "SELECT subject, alias, sealed FROM bank_links WHERE phone_key=%s", (self.indexed("phone", number),))
         if enrolled and expected_subject is not None and enrolled["subject"] != expected_subject:
             enrolled = None
-        if enrolled is None or not (link.data_mode if connected else await link.connect()):
+        if enrolled is None or not (link.display_active if connected else await link.connect()):
             if connected:
                 await link.release()
             await say("Private balance service unavailable.")

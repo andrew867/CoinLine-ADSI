@@ -14,7 +14,7 @@ from . import directory, fdm, flights, graph
 from .api import api, login
 from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
-from .link import lab_call
+from .link import CONTINUOUS_DATA, lab_call
 from .private import PrivateBalances, configure
 from .providers import Providers, choose_site, prefix
 from .regional import CAPITALS, choose, choose_weather
@@ -175,7 +175,10 @@ async def lifespan(app: FastAPI):
             refresh_task = asyncio.create_task(app.state.providers.refresh(lambda: app.state.db.setting("providers")))
         if origin:
             emu_delay = int(os.getenv("ADSI_EMU_ALERT_DELAY_MS", "1000")) / 1000 if os.getenv("ADSI_EMU_ENABLE") == "1" else 1.0
-            app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call, emu_alert_delay=emu_delay)
+            emu_profile = (os.getenv("ADSI_EMU_INTERACTION_PROFILE", CONTINUOUS_DATA)
+                           if os.getenv("ADSI_EMU_ENABLE") == "1" else CONTINUOUS_DATA)
+            app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call, emu_alert_delay=emu_delay,
+                                        emu_interaction_profile=emu_profile)
             task = asyncio.create_task(app.state.gateway.serve())
         yield
     finally:

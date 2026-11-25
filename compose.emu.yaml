@@ -3,6 +3,10 @@ name: coinline-adsi-emu
 services:
   gateway:
     image: ${ADSI_EMU_GATEWAY_IMAGE:-coinline-adsi-emu-gateway}
+    build:
+      target: gateway-emu
+      args:
+        ADSI_NATIVE_MAIL: "0"
     environment:
       ADSI_EMU_ENABLE: "1"
       ADSI_EMU_CALLER_ID: ${ADSI_EMU_CALLER_ID:-7095550100}

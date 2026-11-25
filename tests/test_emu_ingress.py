@@ -42,6 +42,7 @@ class EmulatorIngressTests(unittest.IsolatedAsyncioTestCase):
     async def test_separate_loopback_ports_and_database(self):
         overlay = (ROOT / 'compose.emu.yaml').read_text()
         self.assertIn('name: coinline-adsi-emu', overlay)
+        self.assertIn('target: gateway-emu', overlay)
         self.assertIn('127.0.0.1:5069:5069/udp', overlay)
         self.assertIn('127.0.0.1:18100-18139:18100-18139/udp', overlay)
         self.assertIn('coinline-adsi-emu_db', overlay)

@@ -22,6 +22,10 @@ RUN make -j6 -o third-party NOISY_BUILD=no && make -o third-party install DESTDI
 COPY --chmod=755 deploy/asterisk/build.sh /build/
 RUN /build/build.sh
 
+FROM source AS source-emu
+COPY --chmod=755 deploy/asterisk/build-emu.sh /build/
+RUN /build/build-emu.sh
+
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libedit2 libjansson4 libsqlite3-0 libssl3 libxml2 libuuid1 \
@@ -38,6 +42,14 @@ COPY --from=source /image/usr/sbin/asterisk /usr/sbin/
 COPY --from=source /profiles/gateway/modules/ /usr/lib/asterisk/modules/
 COPY --from=source /profiles/gateway/allowlist /opt/coinline/modules
 COPY --chown=asterisk:asterisk --from=source /image/var/lib/asterisk/ /var/lib/asterisk/
+USER asterisk
+CMD ["gateway"]
+
+FROM runtime AS gateway-emu
+COPY --from=source-emu /image/usr/sbin/asterisk /usr/sbin/
+COPY --from=source-emu /profiles/emu/modules/ /usr/lib/asterisk/modules/
+COPY --from=source-emu /profiles/emu/allowlist /opt/coinline/modules
+COPY --chown=asterisk:asterisk --from=source-emu /image/var/lib/asterisk/ /var/lib/asterisk/
 USER asterisk
 CMD ["gateway"]
 

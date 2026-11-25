@@ -29,6 +29,9 @@ else
 fi
 if [ "${ADSI_EMU_ENABLE:-0}" = 1 ]; then
     test "$profile" = gateway || { echo "Emulator ingress requires the gateway profile." >&2; exit 1; }
+    grep -qx res_pjsip_nat /opt/coinline/modules || {
+        echo "Emulator ingress requires the dedicated NAT-capable gateway image." >&2; exit 1;
+    }
     caller=${ADSI_EMU_CALLER_ID:-7095550100}
     printf '%s\n' "$caller" | grep -Eq '^[2-9][0-9]{2}[2-9][0-9]{6}$' || {
         echo "Set a ten-digit synthetic emulator caller ID." >&2; exit 1;

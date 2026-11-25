@@ -35,6 +35,8 @@ class SearchTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn('YYT', [entry[0] for entry in keypad.matches(flights.ENTRIES, code)])
         self.assertIn('YYZ', flights.INDEX)
         self.assertEqual(len(flights.INDEX), len(flights.AIRPORTS))
+        self.assertEqual(keypad.heading('Airport', '2998', 2), 'Airport 2998 [2]')
+        self.assertLessEqual(len(keypad.heading('Directory', '23456789', 1000)), 20)
 
     async def test_search_backspace_and_select(self):
         link = AsyncMock()

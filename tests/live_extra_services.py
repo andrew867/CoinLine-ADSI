@@ -25,11 +25,11 @@ def main():
                 call.display('COINLINE INFOLINE', timeout=60)
                 press(call, '5', 'MORE SERVICES')
                 press(call, '1', 'AIRPORT BOARDS')
-                press(call, '1', 'Airport ?')
+                press(call, '1', keypad.heading('Airport', '', len(flights.ENTRIES)))
                 query = ''
                 for digit in '2998':
                     query += digit
-                    press(call, digit, f'Airport {query}')
+                    press(call, digit, keypad.heading('Airport', query, len(keypad.matches(flights.ENTRIES, query))))
                 press(call, '1', 'Airport 1-2' if len(keypad.matches(flights.ENTRIES, query)) > 1 else 'Airport 1-1')
                 candidates = keypad.matches(flights.ENTRIES, query)
                 index = [item[0] for item in candidates].index('YYT')
@@ -38,8 +38,8 @@ def main():
                 press(call, str(index % 2 + 1), 'DEMO YYT')
                 press(call, '0', 'AIRPORT BOARDS')
                 press(call, '0', 'MORE SERVICES')
-                press(call, '2', 'Directory ?')
-                press(call, '5', 'Directory 5')
+                press(call, '2', keypad.heading('Directory', '', 1))
+                press(call, '5', keypad.heading('Directory', '5', 1))
                 press(call, '1', 'Directory 1-1')
                 press(call, '1', 'DIRECTORY')
     print('Verified incremental ICAO search, arrival board and directory over SIP.')

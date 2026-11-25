@@ -18,6 +18,11 @@ def matches(entries, query):
     return [entry for entry in entries if any(signature(term).startswith(query) for term in entry[2])]
 
 
+def heading(title, query, count):
+    label = f'{title} {query or "?"} [{count}]'
+    return label if len(label) <= 20 else f'{query or "?"} [{count}] {title}'[:20]
+
+
 async def _screen(link, say, lines, choices, prompt):
     if link.data_mode:
         await link.transfer(wire.screen([graph.handset_text(line)[:20] for line in lines], choices), open_input=True)
@@ -52,8 +57,8 @@ async def select(link, say, title, entries, *, maximum=4):
                 elif digit == '0':
                     listing = False
                 continue
-            lines = [f'{title} {query or "?"}', f'{len(found)} match(es)',
-                     found[0][1] if found else 'No matches', '1 List * Del 0 Exit']
+            preview = [entry[1] for entry in found[:2]] or ['No matches']
+            lines = [heading(title, query, len(found)), *(preview + [' '] * (2 - len(preview))), '1 List * Del 0 Exit']
             digit = await _screen(link, say, lines, [('List', '1'), ('Exit', '0')],
                 f'{title}. {len(found)} matches. Enter one keypad digit per letter. '
                 'Press 1 or pound to list, star to erase, or zero to cancel.')

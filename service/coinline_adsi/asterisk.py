@@ -84,18 +84,25 @@ CallHandler = Callable[[str, str | None, Link, Callable[[str], Awaitable[None]]]
 
 
 class Gateway:
-    def __init__(self, base: str, password: str, handler: CallHandler, limit: int = 10):
+    def __init__(self, base: str, password: str, handler: CallHandler, limit: int = 10,
+                 emu_alert_delay: float = 1.0):
+        if not 0.25 <= emu_alert_delay <= 5.0:
+            raise ValueError("Emulator first-alert delay must be 250 to 5000 ms.")
         self.base = base.rstrip("/")
         self.authorization = "Basic " + base64.b64encode(f"{APP}:{password}".encode()).decode()
         self.http = httpx.AsyncClient(base_url=self.base + "/ari/", auth=(APP, password), timeout=2, trust_env=False)
         self.handler = handler
         self.limit = limit
+        self.emu_alert_delay = emu_alert_delay
         self.connected = False
         self.calls: dict[str, Admission] = {}
         self.pending: dict[str, Admission] = {}
         self.outcomes = Counter()
         self.latencies = deque(maxlen=256)
         self.lab_audio: dict[str, bytes] = {}
+
+    def first_alert_delay(self, route: str) -> float:
+        return self.emu_alert_delay if route == "emu-infoline" else 0.25
 
     def status(self):
         samples = sorted(list(self.latencies)[-100:])
@@ -182,7 +189,7 @@ class Gateway:
                 await self._request("POST", f"bridges/{call.bridge_id}/addChannel",
                                     channel=f"{call.channel_id},{call.media_id}")
             # Let the newly bridged RTP leg start delivering media before CAS.
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(self.first_alert_delay(route))
             stage = "application"
             call.link = Link(media.play, observe=self.latencies.append if route == "lab" else None)
 

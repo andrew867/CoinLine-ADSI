@@ -1,0 +1,28 @@
+# Dedicated loopback laboratory instance, never publish this listener on a LAN.
+name: coinline-adsi-emu
+services:
+  gateway:
+    image: ${ADSI_EMU_GATEWAY_IMAGE:-coinline-adsi-emu-gateway}
+    environment:
+      ADSI_EMU_ENABLE: "1"
+      ADSI_EMU_CALLER_ID: ${ADSI_EMU_CALLER_ID:-7095550100}
+    ports: !override
+      - "127.0.0.1:5069:5069/udp"
+      - "127.0.0.1:18100-18139:18100-18139/udp"
+  app:
+    image: ${ADSI_EMU_APP_IMAGE:-coinline-adsi-emu-app}
+    environment:
+      ADSI_EMU_ENABLE: "1"
+      ADSI_EMU_ALERT_DELAY_MS: ${ADSI_EMU_ALERT_DELAY_MS:-1000}
+      ADSI_LOCAL_BANK_ENROLLMENT: "0"
+      ADSI_LOCAL_PRIVATE_CALLS: "0"
+      ADSI_SIP_BIND: "127.0.0.1"
+    ports: !override
+      - "127.0.0.1:${ADSI_EMU_WEB_PORT:-8089}:8080"
+  migrate:
+    image: ${ADSI_EMU_APP_IMAGE:-coinline-adsi-emu-app}
+  terminal-emu:
+    image: ${ADSI_EMU_TERMINAL_IMAGE:-coinline-adsi-emu-terminal}
+volumes:
+  db:
+    name: ${ADSI_EMU_DB_VOLUME:-coinline-adsi-emu_db}

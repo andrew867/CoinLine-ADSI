@@ -28,7 +28,7 @@ type Simulation = {
 type Settings = { value: Record<string, unknown>; generation: number };
 type Feature = { text: string; version: number; approved: boolean; launcher: boolean; sha256?: string };
 type Route = { name: string; revision_id: string | null };
-type Telephony = { ready: boolean; active: number };
+type Telephony = { ready: boolean; active: number; emulatorIngress?: { uri: string; fromUser: string; firstAlertMs: number } };
 type Point = { x: number; y: number };
 
 const operations: Record<string, string> = {
@@ -189,6 +189,11 @@ function App() {
       <h1>Setup</h1>
       <section className="panel"><h2>Incoming routes</h2><dl><dt>Status</dt>
         <dd>{telephony?.ready ? `Ready, ${telephony.active} active calls` : "Gateway unavailable"}</dd>
+        {telephony?.emulatorIngress && <>
+          <dt>2374</dt><dd>{telephony.emulatorIngress.uri}</dd>
+          <dt>Emulator identity</dt><dd>{telephony.emulatorIngress.fromUser} (local, no registration)</dd>
+          <dt>First ADSI alert</dt><dd>{telephony.emulatorIngress.firstAlertMs} ms after media bridge</dd>
+        </>}
         <dt>6500</dt><dd>ADSI lab exchange</dd>
         <dt>6501</dt><dd>{routes[0]?.revision_id ? "Published InfoLine revision" : "No active application"}</dd></dl></section>
       <section className="panel"><h2>Data providers</h2>

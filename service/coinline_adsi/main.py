@@ -37,6 +37,9 @@ async def lifespan(app: FastAPI):
                                    os.getenv("ADSI_SIP_BIND") == "127.0.0.1")
 
     async def handle_call(route, caller, link, say):
+        if route == "emu-infoline" and os.getenv("ADSI_EMU_ENABLE") != "1":
+            await say("Emulator service unavailable.")
+            return
         if route == "lab":
             await lab_call(link, say)
             return
@@ -60,7 +63,7 @@ async def lifespan(app: FastAPI):
                                                       requested.get("launcher", False)):
                 await say("No resident download is available.")
             return
-        revision = await store.route("infoline" if route in ("private-infoline", "private-lab-infoline") else route) if store else None
+        revision = await store.route("infoline" if route in ("private-infoline", "private-lab-infoline", "emu-infoline") else route) if store else None
         if revision is None:
             await say("This application is unavailable.")
             return
@@ -171,7 +174,8 @@ async def lifespan(app: FastAPI):
             await app.state.db.pool.open(wait=True, timeout=5)
             refresh_task = asyncio.create_task(app.state.providers.refresh(lambda: app.state.db.setting("providers")))
         if origin:
-            app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call)
+            emu_delay = int(os.getenv("ADSI_EMU_ALERT_DELAY_MS", "1000")) / 1000 if os.getenv("ADSI_EMU_ENABLE") == "1" else 1.0
+            app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call, emu_alert_delay=emu_delay)
             task = asyncio.create_task(app.state.gateway.serve())
         yield
     finally:

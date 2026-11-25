@@ -27,6 +27,21 @@ if [ "$profile" = native ]; then
 else
     cp "/etc/coinline/extensions-$profile.conf" "$config/extensions.conf"
 fi
+if [ "${ADSI_EMU_ENABLE:-0}" = 1 ]; then
+    test "$profile" = gateway || { echo "Emulator ingress requires the gateway profile." >&2; exit 1; }
+    caller=${ADSI_EMU_CALLER_ID:-7095550100}
+    printf '%s\n' "$caller" | grep -Eq '^[2-9][0-9]{2}[2-9][0-9]{6}$' || {
+        echo "Set a ten-digit synthetic emulator caller ID." >&2; exit 1;
+    }
+    self_ip=$(hostname -i | awk '{print $1}')
+    printf '%s\n' "$self_ip" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || {
+        echo "The emulator ingress requires an IPv4 gateway address." >&2; exit 1;
+    }
+    printf '\n' >> "$config/pjsip.conf"
+    sed "s/@EMU_CONTAINER_IP@/$self_ip/g;s/@EMU_CALLER_ID@/$caller/g" /etc/coinline/pjsip-emu.conf >> "$config/pjsip.conf"
+    cat /etc/coinline/extensions-emu.conf >> "$config/extensions.conf"
+    cp /etc/coinline/rtp-emu.conf "$config/rtp.conf"
+fi
 {
     echo '[modules]'
     echo 'autoload=no'

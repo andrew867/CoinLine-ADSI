@@ -48,6 +48,11 @@ jobs:
           npm audit --audit-level=high
           npx playwright install --with-deps chromium
           npx playwright test
+      - name: Verify host-published emulator SIP ingress
+        run: |
+          docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profile verify build gateway app terminal-emu
+          docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profile verify up -d --no-build --wait gateway app
+          python tests/live_emu_ingress.py
       - name: Exercise capacity and resident persistence
         if: github.event_name == 'schedule'
         run: |

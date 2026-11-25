@@ -436,8 +436,10 @@ int main(int argc, char **argv)
         return 0;
     }
     const char *password = std::getenv("ADSI_SIP_PASSWORD");
-    if ((argc != 3 && argc != 4) || !password) {
-        std::cerr << "Usage: terminal-emu HOST lab|reference|fallback|interactive|fdm [EXTENSION] with ADSI_SIP_PASSWORD set\n";
+    const char *peerFlag = std::getenv("ADSI_EMULATOR_PEER_ONLY");
+    const bool peerOnly = peerFlag && std::string(peerFlag) == "1";
+    if ((argc != 3 && argc != 4) || (!password && !peerOnly)) {
+        std::cerr << "Usage: terminal-emu HOST lab|reference|fallback|interactive|fdm [EXTENSION] with ADSI_SIP_PASSWORD or ADSI_EMULATOR_PEER_ONLY set\n";
         return 2;
     }
     const std::string host = argv[1];
@@ -499,16 +501,18 @@ int main(int argc, char **argv)
         bool passed = true;
         {
             pj::AccountConfig config;
-            std::string caller = "lab";
+            std::string caller = peerOnly ? "co" : "lab";
             if (const char *testCaller = std::getenv("ADSI_EMULATOR_CALLER_ID")) {
-                if (scenario == "interactive" && (extension == "6501" || extension == "6504") &&
+                if (!peerOnly && scenario == "interactive" && (extension == "6501" || extension == "6504") &&
                     std::regex_match(testCaller, std::regex("[2-9][0-9]{2}[2-9][0-9]{6}"))) {
                     caller = testCaller;
                 }
             }
             config.idUri = "sip:" + caller + "@" + host;
             config.mediaConfig.transportConfig.port = 0;
-            config.sipConfig.authCreds.emplace_back("digest", "*", "lab", 0, password);
+            if (!peerOnly) {
+                config.sipConfig.authCreds.emplace_back("digest", "*", "lab", 0, password);
+            }
             pj::Account account;
             account.create(config);
             for (long index = 0; index < repetitions; ++index) {

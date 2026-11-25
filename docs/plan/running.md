@@ -16,6 +16,7 @@ The initializer creates an ignored `.env` with generated lab credentials. The we
 | 6501 | Published application. The initial revision is CoinLine InfoLine. |
 | 6502 | Synthetic balance demonstration, gated by `ADSI_DEMO_PIN` |
 | 6503 | Resident feature lab route, enabled with `ADSI_FDM_ENABLE=1` and a one-shot approval |
+| 6504 | Private local InfoLine test, enabled with `ADSI_LOCAL_PRIVATE_CALLS=1` and local banking enrollment |
 
 ```sh
 sh tests/check-modules.sh
@@ -51,7 +52,9 @@ The glossary is enabled by setting `assistant` to true. An optional HTTPS Chat C
 
 ## Controlled resident and private labs
 
-For a single-operator local SimpleFIN connection test, set `ADSI_LOCAL_BANK_ENROLLMENT=1` in the ignored `.env` and recreate the app. The initializer supplies `ADSI_DATA_KEY`, which must remain stable. Sign in to the console using the existing access code and open `/bank` on the same loopback web origin. Paste the Setup Token into the password field and claim it once. The returned Access URL is encrypted in PostgreSQL before account discovery runs. A reload or failed account request uses **Resume saved setup**, without another claim. Choose an account, an alias and the intended line number, then use **Test read-only connection** to verify the balance and recent transaction retrieval. The line number is stored as a keyed index. The local test mode provides web verification only. Real telephone access requires the private-route and OIDC qualification below.
+For a single-operator local SimpleFIN connection test, set `ADSI_LOCAL_BANK_ENROLLMENT=1` in the ignored `.env` and recreate the app. The initializer supplies `ADSI_DATA_KEY`, which must remain stable. Sign in to the console using the existing access code and open `/bank` on the same loopback web origin. Paste the Setup Token into the password field and claim it once. The returned Access URL is encrypted in PostgreSQL before account discovery runs. A reload or failed account request uses **Resume saved setup**, without another claim. Choose an account, an alias and the intended line number, then use **Test read-only connection** to verify the balance and recent transaction retrieval. The line number is stored as a keyed index.
+
+To exercise the enrolled account from the local standalone terminal, set `ADSI_LOCAL_PRIVATE_CALLS=1` and retain the loopback SIP bind. Dial 6504 using the enrolled ten-digit caller ID, then choose Finance, Banking and Private account. Enter the challenge shown on the display into `/bank` and key the returned eight-digit approval code into the terminal. Use the Trans softkey to view up to ten most recent posted transactions, Next to page and Exit to clear the display. The local extension requires the authenticated lab SIP endpoint and console approval. The emulator suppresses private signal traces and clears its display on hangup. Production private routes retain OIDC and physical endpoint qualification requirements.
 
 An uncertain claim result requires checking or revoking the connection in SimpleFIN Bridge before discarding the pending setup and generating another token. The app reserves a persistent limit of 24 account-list requests per UTC day and 24 requests per enrolled account per UTC day. A balance and transaction verification consumes two account requests. The connection test reports the source balance timestamp and flags stale or future-dated data. Telephone balance presentation still requires a timestamp within the preceding 48 hours. No setup token is saved in a configuration file or source artifact. [SimpleFIN developer guide](https://beta-bridge.simplefin.org/info/developers) and [protocol](https://www.simplefin.org/protocol.html).
 

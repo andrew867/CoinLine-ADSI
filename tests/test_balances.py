@@ -1,4 +1,5 @@
 import base64
+import json
 import unittest
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -11,6 +12,73 @@ from coinline_adsi.private import PrivateBalances
 
 
 class BalanceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_local_private_call_approval_balance_and_recent_transactions(self):
+        now = datetime.now(UTC)
+        requests = []
+        enrolled = {}
+
+        async def query(sql, parameters):
+            if "FROM bank_links WHERE phone_key" in sql:
+                return enrolled.copy()
+            if "FROM bank_links WHERE subject" in sql:
+                return {"sealed": enrolled["sealed"]}
+            if sql.startswith("INSERT INTO bank_reads"):
+                return {"used": 1}
+            self.fail("Unexpected database operation")
+
+        store = type("TestStore", (), {})()
+        store._one = AsyncMock(side_effect=query)
+        def route(request):
+            requests.append(request.url.params)
+            account = {"id": "fixture-account", "conn_id": "fixture-connection", "currency": "CAD",
+                       "balance": "42.17", "balance-date": int(now.timestamp())}
+            if "balances-only" not in request.url.params:
+                account["transactions"] = [
+                    {"posted": int((now - timedelta(days=2)).timestamp()), "amount": "-2.50", "description": "Fixture purchase"},
+                    {"posted": int((now - timedelta(days=1)).timestamp()), "amount": "12.00", "description": "Fixture deposit"},
+                ]
+            return httpx.Response(200, json={"accounts": [account]})
+
+        async with httpx.AsyncClient(transport=httpx.MockTransport(route)) as client:
+            service = PrivateBalances(store, client, b"fixture-key" * 3)
+            subject = service.local_subject()
+            enrolled.update(subject=subject, alias="Fixture", sealed=service.cipher.encrypt(json.dumps({
+                "access": "https://fixture:fixture@bridge.simplefin.org/simplefin", "account": "fixture-account",
+                "connection": "fixture-connection"}).encode()))
+            screens, digits = [], []
+            class FixtureLink:
+                data_mode = True
+                released = False
+                async def transfer(self, data, **kwargs):
+                    screens.append(data)
+                    if b"Approval" in data:
+                        self.assert_no_read()
+                        challenge = next(iter(service.approvals.pending))
+                        self.assert_wrong_subject(challenge)
+                        code = service.approvals.approve(challenge, subject)
+                        digits.extend(code + "190")
+                async def selection(self, timeout):
+                    return digits.pop(0)
+                async def release(self):
+                    self.released = True
+                def assert_no_read(self):
+                    if requests:
+                        raise AssertionError("Provider read before approval")
+                def assert_wrong_subject(self, challenge):
+                    if service.approvals.approve(challenge, "foreign-subject") is not None:
+                        raise AssertionError("Foreign approval accepted")
+            link = FixtureLink()
+            await service.call("7095550100", link, AsyncMock(), connected=True, expected_subject=subject)
+            self.assertEqual(len(requests), 2)
+            self.assertTrue(any(b"CAD 42.17" in screen for screen in screens))
+            self.assertTrue(any(b"Fixture deposit" in screen for screen in screens))
+            self.assertTrue(any(b"Fixture purchase" in screen for screen in screens))
+            self.assertIn(b"GOODBYE", screens[-1])
+            self.assertTrue(link.released)
+            self.assertFalse(service.approvals.pending)
+            await service.call("7095550100", FixtureLink(), AsyncMock(), connected=True, expected_subject="foreign-subject")
+            self.assertEqual(len(requests), 2)
+
     async def test_connection_inspection_preserves_phone_freshness_gate(self):
         now = datetime(2026, 2, 7, 15, tzinfo=UTC)
         stamp = int((now + timedelta(minutes=15)).timestamp())

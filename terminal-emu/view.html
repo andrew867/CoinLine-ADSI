@@ -30,7 +30,7 @@
   </div>
   <p id="status" aria-live="polite">Idle</p>
 </main>
-<details><summary>Signal trace</summary><pre id="trace"></pre></details>
+<details id="trace-panel"><summary>Signal trace</summary><pre id="trace"></pre></details>
 <script>
   const el = (id) => document.getElementById(id);
   async function send(path, value, caller) {
@@ -67,6 +67,7 @@
         key.setAttribute("aria-label", label || "Unassigned softkey");
       });
       el("trace").textContent = state.trace.map(event => JSON.stringify(event)).join("\n");
+      el("trace-panel").hidden = state.private;
     } catch {
       el("status").textContent = "Terminal unavailable";
     }

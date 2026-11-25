@@ -20,3 +20,7 @@ Remaining live gates are CBC and PlayNow network availability, supported OLG acc
 ## SimpleFIN enrollment follow-up
 
 The official Bridge demonstration token was claimed through the authenticated local web enrollment endpoint. Three account choices were recovered from encrypted pending storage after an actual app container restart. Account linking and the read-only connection test succeeded, including ten recent posted transactions. The demo balance timestamp was in the future and was explicitly identified by the inspection response. The telephone freshness gate remains unchanged. The demo enrollment was unlinked after testing. The regression suite passed 36 tests, including recovery after an account-discovery failure following a successful claim. Paid-account enrollment and private SIP qualification remain pending.
+
+## Local private InfoLine test
+
+The dedicated loopback private extension 6504 navigated the published InfoLine graph through Finance and Banking. A call without an enrolled caller identity was rejected, the private trace remained empty and the emulator display cleared at hangup. A synthetic-account regression exercised call-bound approval, rejected approval from a different subject, retrieved the current balance and two recent posted transactions, paged both activity screens and cleared the display. The suite passed 37 automated tests. Physical handset qualification remains pending.

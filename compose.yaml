@@ -28,6 +28,8 @@ services:
       ADSI_DEMO_PIN: ${ADSI_DEMO_PIN:-}
       ADSI_DATA_KEY: ${ADSI_DATA_KEY:-}
       ADSI_LOCAL_BANK_ENROLLMENT: ${ADSI_LOCAL_BANK_ENROLLMENT:-0}
+      ADSI_LOCAL_PRIVATE_CALLS: ${ADSI_LOCAL_PRIVATE_CALLS:-0}
+      ADSI_SIP_BIND: ${ADSI_BIND:-127.0.0.1}
       ADSI_FDM_ENABLE: ${ADSI_FDM_ENABLE:-0}
       ADSI_REGIONAL_ENABLE: ${ADSI_REGIONAL_ENABLE:-0}
       ADSI_HEADLINEFEED_KEY: ${ADSI_HEADLINEFEED_KEY:-}
@@ -91,6 +93,8 @@ services:
 
   terminal-emu:
     profiles: [verify]
+    logging:
+      driver: none
     build:
       context: .
       dockerfile: terminal-emu/Dockerfile

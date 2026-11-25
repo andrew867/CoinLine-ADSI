@@ -32,6 +32,9 @@ async def lifespan(app: FastAPI):
         bytes.fromhex(os.environ["ADSI_DATA_KEY"]) if os.getenv("ADSI_LOCAL_BANK_ENROLLMENT") == "1" else None)
     app.state.private = PrivateBalances(app.state.db, app.state.providers.client, private_key) if (
         private_key and app.state.db) else None
+    app.state.local_private = bool(app.state.private and not app.state.oidc and
+                                   os.getenv("ADSI_LOCAL_PRIVATE_CALLS") == "1" and
+                                   os.getenv("ADSI_SIP_BIND") == "127.0.0.1")
 
     async def handle_call(route, caller, link, say):
         if route == "lab":
@@ -48,12 +51,15 @@ async def lifespan(app: FastAPI):
                 await say("Private balance service unavailable.")
             return
         store = app.state.db
+        if route == "private-lab-infoline" and not app.state.local_private:
+            await say("Private laboratory calling is unavailable.")
+            return
         if route == "resident-lab":
             requested = await store.take_download() if store and os.getenv("ADSI_FDM_ENABLE") == "1" else None
             if not requested or not await fdm.install(link, requested["text"], requested["version"]):
                 await say("No resident download is available.")
             return
-        revision = await store.route("infoline" if route == "private-infoline" else route) if store else None
+        revision = await store.route("infoline" if route in ("private-infoline", "private-lab-infoline") else route) if store else None
         if revision is None:
             await say("This application is unavailable.")
             return
@@ -127,7 +133,9 @@ async def lifespan(app: FastAPI):
                 return True
             if node.get("action") == "private-balance":
                 private = app.state.private
-                if route == "private-infoline" and private and app.state.oidc and os.getenv("ADSI_PRIVATE_BALANCES") == "1":
+                if route == "private-lab-infoline" and app.state.local_private:
+                    await private.call(caller, link, say, connected=True, expected_subject=private.local_subject())
+                elif route == "private-infoline" and private and app.state.oidc and os.getenv("ADSI_PRIVATE_BALANCES") == "1":
                     await private.call(caller, link, say, connected=True)
                 else:
                     await link.release()

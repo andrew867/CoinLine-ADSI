@@ -23,13 +23,14 @@ class Dialer:
         self.reset()
 
     def reset(self):
-        self.state = {"lines": ["ON HOOK"], "keys": [""] * 6, "status": "Idle", "trace": []}
+        self.state = {"lines": ["ON HOOK"], "keys": [""] * 6, "status": "Idle", "trace": [], "private": False}
 
     def dial(self, ext, caller=""):
         with self.lock:
             if self.call and self.call.poll() is None:
                 return False
             self.reset()
+            self.state["private"] = ext == "6504"
             environment = dict(os.environ)
             environment.pop("ADSI_EMULATOR_CALLER_ID", None)
             if caller:
@@ -58,13 +59,16 @@ class Dialer:
                     self.state["lines"] = event["lines"]
                     self.state["keys"] = event["softkeys"]
                     self.state["status"] = event["mode"].capitalize()
-                if "sample" in event:
+                if "sample" in event and not self.state["private"]:
                     self.state["trace"] = [*self.state["trace"][-31:], event]
         process.wait()
         with self.lock:
             if self.call is process:
                 self.state["status"] = "Call ended" if process.returncode == 0 else "Call failed"
                 self.state["keys"] = [""] * 6
+                if self.state["private"]:
+                    self.state["lines"] = ["ON HOOK"]
+                    self.state["trace"] = []
 
     def press(self, action):
         with self.lock:
@@ -123,7 +127,7 @@ def main():
                 value = request.get("value", "")
                 if self.path == "/dial" and re.fullmatch(r"[0-9]{1,10}", value):
                     caller = request.get("caller", "")
-                    if caller and (value != "6501" or not re.fullmatch(r"[2-9]\d{2}[2-9]\d{6}", caller)):
+                    if caller and (value not in ("6501", "6504") or not re.fullmatch(r"[2-9]\d{2}[2-9]\d{6}", caller)):
                         raise ValueError
                     result = dialer.dial(value, caller)
                 elif self.path == "/press" and re.fullmatch(r"[0-9*#]|k[1-6]|hangup", value):

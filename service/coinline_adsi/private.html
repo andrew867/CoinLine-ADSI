@@ -56,7 +56,7 @@
     byId("verify").hidden = !state.linked;
     byId("resume").hidden = !state.claimed;
     byId("discard").hidden = !state.pending;
-    byId("call-approval").hidden = state.local;
+    byId("call-approval").hidden = !state.call_approval;
     show(state.pending ? (state.claimed ? "Access saved. Resume account selection." : "Claim status uncertain. Check SimpleFIN Bridge before discarding.") : state.linked ? "Linked account: " + state.alias : "No account linked");
   }
   function selectAccounts(accounts) {

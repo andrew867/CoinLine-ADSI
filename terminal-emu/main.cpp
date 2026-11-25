@@ -43,7 +43,8 @@ double tonePower(std::span<const int16_t> samples, int frequency)
 
 class AudioPort : public pj::AudioMediaPort {
 public:
-    explicit AudioPort(std::string scenario, bool attached = true) : scenario_(std::move(scenario)),
+    explicit AudioPort(std::string scenario, bool attached = true, bool privateDisplay = false) : scenario_(std::move(scenario)),
+                                                                  privateDisplay_(privateDisplay),
                                                                   terminal_(scenario_ == "fdm")
     {
         serial_ = async_rx_init(nullptr, 8, ASYNC_PARITY_NONE, 1, false, &receivedByte, this);
@@ -119,6 +120,13 @@ public:
 private:
     void record(Json event)
     {
+        if (privateDisplay_) {
+            if (event.contains("lines") && event.value("valid", false)) {
+                std::cout << Json{{"valid", true}, {"line", event["line"]}, {"lines", event["lines"]},
+                                  {"softkeys", event["softkeys"]}, {"mode", event["mode"]}}.dump() << std::endl;
+            }
+            return;
+        }
         event["sample"] = samples_;
         if (scenario_ == "interactive") {
             std::cout << event.dump() << std::endl;
@@ -282,6 +290,7 @@ private:
 
     std::mutex mutex_;
     const std::string scenario_;
+    const bool privateDisplay_;
     Terminal terminal_;
     async_rx_state_t *serial_;
     fsk_rx_state_t *modem_;
@@ -330,9 +339,10 @@ private:
     bool connected = false;
 };
 
-Json runCall(pj::Endpoint &endpoint, pj::Account &account, const std::string &scenario, const std::string &uri)
+Json runCall(pj::Endpoint &endpoint, pj::Account &account, const std::string &scenario, const std::string &uri,
+             bool privateDisplay = false)
 {
-    AudioPort port(scenario);
+    AudioPort port(scenario, true, privateDisplay);
     Call call(account, port);
     pj::CallOpParam operation(true);
     operation.opt.videoCount = 0;
@@ -473,7 +483,7 @@ int main(int argc, char **argv)
             pj::AccountConfig config;
             std::string caller = "lab";
             if (const char *testCaller = std::getenv("ADSI_EMULATOR_CALLER_ID")) {
-                if (scenario == "interactive" && extension == "6501" &&
+                if (scenario == "interactive" && (extension == "6501" || extension == "6504") &&
                     std::regex_match(testCaller, std::regex("[2-9][0-9]{2}[2-9][0-9]{6}"))) {
                     caller = testCaller;
                 }
@@ -484,7 +494,7 @@ int main(int argc, char **argv)
             pj::Account account;
             account.create(config);
             for (long index = 0; index < repetitions; ++index) {
-                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host);
+                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host, extension == "6504");
                 std::cout << result.dump() << std::endl;
                 passed &= result["passed"].get<bool>();
                 if (index + 1 < repetitions) {

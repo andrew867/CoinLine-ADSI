@@ -73,6 +73,9 @@ class PrivateBalances:
     def indexed(self, label, value):
         return hmac.digest(self.key, f"{label}\0{value}".encode(), "sha256").hex()
 
+    def local_subject(self):
+        return self.indexed("subject", "local-enrollment-owner")
+
     async def claim(self, subject, token):
         self.bridge.claim_url(token)
         claim_id = uuid4()
@@ -162,10 +165,12 @@ class PrivateBalances:
             await db.execute("DELETE FROM bank_links WHERE subject=%s", (subject,))
             await self.store._log(db, "bank_unlink", subject)
 
-    async def call(self, caller, link, say, *, connected=False):
+    async def call(self, caller, link, say, *, connected=False, expected_subject=None):
         number = _number(caller)
         enrolled = None if number is None else await self.store._one(
             "SELECT subject, alias, sealed FROM bank_links WHERE phone_key=%s", (self.indexed("phone", number),))
+        if enrolled and expected_subject is not None and enrolled["subject"] != expected_subject:
+            enrolled = None
         if enrolled is None or not (link.data_mode if connected else await link.connect()):
             if connected:
                 await link.release()
@@ -275,7 +280,7 @@ def context(request, write=False):
     service = request.app.state.private
     if service and not request.app.state.oidc and os.getenv("ADSI_LOCAL_BANK_ENROLLMENT") == "1":
         principal(request)
-        subject = service.indexed("subject", "local-enrollment-owner")
+        subject = service.local_subject()
     else:
         subject = request.session.get("subject") if request.app.state.oidc else None
     if not service or not subject:
@@ -328,7 +333,8 @@ async def enrollment(request: Request):
     pending = await service.pending(subject)
     return JSONResponse({"linked": record is not None, "alias": record["alias"] if record else None,
             "pending": bool(pending), "claimed": bool(pending and pending["access_sealed"]),
-            "local": not bool(request.app.state.oidc)}, headers={"Cache-Control": "no-store"})
+            "local": not bool(request.app.state.oidc),
+            "call_approval": bool(request.app.state.oidc or request.app.state.local_private)}, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/api/v1/enrollment/bank-link")
@@ -373,7 +379,9 @@ async def unlink(request: Request):
 @router.post("/api/v1/enrollment/call-approval")
 async def approve(data: Challenge, request: Request):
     service, subject = context(request, write=True)
+    if not (request.app.state.oidc or request.app.state.local_private):
+        raise HTTPException(403, "Private calling is disabled.")
     code = service.approvals.approve(data.challenge, subject)
     if code is None:
         raise HTTPException(404, "No approval is available.")
-    return {"code": code}
+    return JSONResponse({"code": code}, headers={"Cache-Control": "no-store"})

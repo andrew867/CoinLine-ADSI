@@ -40,7 +40,7 @@ class SearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_search_backspace_and_select(self):
         link = AsyncMock()
-        link.data_mode = True
+        link.display_active = True
         link.selection.side_effect = ['9', '8', '*', '9', '8', '1', '1']
         entries = [('YYT', 'YYT CYYT', ('YYT', 'CYYT')), ('YYZ', 'YYZ CYYZ', ('YYZ', 'CYYZ'))]
         self.assertEqual(await keypad.select(link, AsyncMock(), 'Airport', entries), 'YYT')
@@ -52,7 +52,7 @@ class SearchTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancel_no_result_and_voice_fallback(self):
         link = AsyncMock()
-        link.data_mode = False
+        link.display_active = False
         link.open_voice_input = Mock()
         link.selection.side_effect = ['2', '1', '0']
         say = AsyncMock()
@@ -82,7 +82,7 @@ class SearchTests(unittest.IsolatedAsyncioTestCase):
         config = {'directory': [{'name': 'Demo Help', 'number': '7001', 'detail': 'Local extension'}]}
         providers.check_config(config)
         link = AsyncMock()
-        link.data_mode = True
+        link.display_active = True
         link.selection.side_effect = ['4', '3', '5', '7', '1', '1']
         number = await directory.choose(link, AsyncMock(), config)
         self.assertEqual(number, '7001')

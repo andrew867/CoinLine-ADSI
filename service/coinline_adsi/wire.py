@@ -51,7 +51,25 @@ def key_map(keys: list[int]) -> bytes:
     return parameter(0x81, bytes([*keys, *([1] * (6 - len(keys)))]))
 
 
-def screen(lines: list[str], choices: list[tuple[str, str]]) -> bytes:
+VOICE_MODE = parameter(0x87, b"\0")
+
+
+def information_flags(flags: bytes) -> bytes:
+    """Encode an explicit two-octet information control value."""
+    if len(flags) != 2:
+        raise ValueError("information flags require two bytes")
+    return parameter(0x84, flags)
+
+
+def finish_in_voice(data: bytes) -> bytes:
+    """Append an immediate voice transition to a complete SDC frame."""
+    if (len(data) < 4 or data[0] != DISPLAY or data[1] != len(data) - 3
+            or data[2] != 1 or sum(data) & 255):
+        raise ValueError("expected a valid single SDC frame")
+    return frame(data[3:-1], VOICE_MODE)
+
+
+def screen(lines: list[str], choices: list[tuple[str, str]], *, information: bytes | None = None) -> bytes:
     if not 1 <= len(lines) <= 4:
         raise ValueError("invalid viewport height")
     keys = [softkey(16 + index, label, digit) for index, (label, digit) in enumerate(choices)]
@@ -62,10 +80,11 @@ def screen(lines: list[str], choices: list[tuple[str, str]]) -> bytes:
         select_line(1),
         *keys,
         key_map(list(range(16, 16 + len(keys)))),
+        *([information_flags(information)] if information is not None else []),
     )
 
 
 CONNECT = frame(parameter(0x8E), parameter(0x86))
 LAB = frame(display_line(1, "LAB"), select_line(1), softkey(16, "Go", "1"), key_map([16]))
 OK = frame(parameter(0x88), display_line(1, "OK"), select_line(1))
-RELEASE = frame(parameter(0x85), parameter(0x87, b"\0"))
+RELEASE = frame(parameter(0x85), VOICE_MODE)

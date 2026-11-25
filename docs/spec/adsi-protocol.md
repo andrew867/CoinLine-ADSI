@@ -20,6 +20,14 @@ The first profile reproduces the observable **Asterisk 22 off-hook ADSI subset**
 
 The caller-ID SDMF, MDMF and VMWI types and 30-byte on-hook seizure are outside this subset. Lab codec is G.711 PCMU at 8 kHz, mono, with a nominal 20 ms packet interval and media anchored at Asterisk. The service side uses 8 kHz signed linear PCM. Verify silence suppression, gain, echo cancellation, packet loss handling and passthrough settings on the chosen ATA. Start with in-band DTMF detection on the gateway and deliver canonical completed digits from the caller leg through ARI. An RFC 4733 profile may replace that path when negotiation and transport of A through D are demonstrated. Each route uses one digit event source. Use ordered PCM and an independent DTMF detector in the direct diagnostic adapter. [Media sources](../sources.md#s1-asterisk-pjsip-ari-and-media) · [Asterisk wire reference](../sources.md#s2-adsi-server-reference)
 
+### Interactive media profiles
+
+The default `continuous-data` profile retains data mode between screens. It remains available for the software test peer and existing deployments. The independent `voice-between-screens` profile is selected only on the dedicated emulator ingress. IBM/Blueworx documents that switching to data disables voice and key input; native Asterisk voicemail restores voice after constructing its interactive screens. [Data-mode behavior](https://docs.blueworx.com/BVR/InfoCenter/V6.1/AIX/help/topic/com.ibm.wvraix.adsi.doc/i1009909.html) · [Native voicemail screen](https://github.com/asterisk/asterisk/blob/22/apps/app_voicemail.c#L7493)
+
+The alternative appends `87 01 00` to each interactive display frame, not the disconnect parameter `85 00`. The confirmed D1 opens input while the SDC session and its screen remain active. A keypad or softkey returns the same ordinary DTMF digit as before. Before another FSK spill, including release, require a fresh CAS and A if the terminal is in voice mode. Observe optional B separately; it is neither a message acknowledgment nor a menu selection. Failed capability during an established session or an unresolved D1 ends the call without retry or advancing to a different screen, because the terminal mode and the identity of a late acknowledgment cannot be established. The 500 ms and 1000 ms deadlines do not change.
+
+The separate INFORMATION control encoder accepts exactly two bytes. The synthetic explicit-information fixture tests `84 02 F4 00` independently of the voice transition; it is not emitted by the default or alternative menu profile, and its device-specific effect is not established. The physical key mapping and actual terminal interaction remain hardware qualifications, not inferred from decoding the display.
+
 ### Call state machine
 
 | State | Entry action and transitions |

@@ -289,7 +289,7 @@ async def choose_site(config, caller: str | None, link: Link, say) -> str:
     async def choose(title, entries):
         lines = [graph.handset_text(title)[:20]] + [graph.handset_text(f"{index} {name}")[:20]
                                                    for index, name in enumerate(entries, 1)]
-        if link.data_mode:
+        if link.display_active:
             await link.transfer(wire.screen(lines, [(graph.handset_text(label)[:7], str(index))
                                                      for index, label in enumerate(entries, 1)]), open_input=True)
         else:

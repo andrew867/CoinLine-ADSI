@@ -53,6 +53,8 @@ jobs:
           docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profile verify build gateway app terminal-emu
           docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profile verify up -d --no-build --wait gateway app
           python tests/live_emu_ingress.py
+          ADSI_EMU_INTERACTION_PROFILE=voice-between-screens docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml up -d --no-build --wait app
+          python tests/live_mixed_profile.py --network container:coinline-adsi-emu-gateway-1 --image coinline-adsi-emu-terminal --profile voice-between-screens
       - name: Exercise capacity and resident persistence
         if: github.event_name == 'schedule'
         run: |

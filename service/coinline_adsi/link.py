@@ -12,6 +12,9 @@ LAB_RESTORED = "Voice restored. Goodbye."
 LAB_VOICE_MENU = "CoinLine. Press one to continue."
 LAB_VOICE_REPLY = "OK. Goodbye."
 LAB_PROMPTS = (LAB_RESTORED, LAB_VOICE_MENU, LAB_VOICE_REPLY)
+CONTINUOUS_DATA = "continuous-data"
+VOICE_BETWEEN_SCREENS = "voice-between-screens"
+PROFILES = (CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS)
 
 
 @dataclass(frozen=True)
@@ -26,7 +29,9 @@ class LinkFailure(RuntimeError):
 
 class Link:
     def __init__(self, play: Play, *, reply_timeout: float = 1.0, probe_timeout: float = 0.5,
-                 observe: Callable[[float], None] | None = None):
+                 observe: Callable[[float], None] | None = None, profile: str = CONTINUOUS_DATA):
+        if profile not in PROFILES:
+            raise ValueError("unknown ADSI interaction profile")
         self._play = play
         self._reply_timeout = reply_timeout
         self._probe_timeout = probe_timeout
@@ -35,8 +40,15 @@ class Link:
         self._last_ack = 0.0
         self._selected: float | None = None
         self._observe = observe
+        self.profile = profile
+        self._session_open = False
         self.data_mode = False
         self.uncertain = False
+
+    @property
+    def display_active(self) -> bool:
+        # A live SDC session can retain its screen while the media is in voice mode.
+        return self._session_open or self.data_mode
 
     def receive(self, value: str, when: float) -> None:
         self._digits.put_nowait(Digit(value, when))
@@ -53,17 +65,21 @@ class Link:
                 if received.time >= after:
                     return received
 
-    async def connect(self) -> bool:
+    async def _alert(self) -> bool:
         self._discard_input()
         played = await self._play(audio.cas())
         try:
             reply = await self._digit(played, self._probe_timeout)
         except TimeoutError:
             return False
-        if reply.value != "A":
+        return reply.value == "A"
+
+    async def connect(self) -> bool:
+        if not await self._alert():
             return False
         self.data_mode = True
         await self.transfer(wire.CONNECT)
+        self._session_open = True
         return True
 
     async def _acknowledged(self, pcm: bytes) -> bool:
@@ -83,21 +99,38 @@ class Link:
         if self.uncertain:
             raise LinkFailure("prior acknowledgment is unresolved")
         self._input_since = None
+        mixed = self.profile == VOICE_BETWEEN_SCREENS
+        if mixed and open_input:
+            data = wire.finish_in_voice(data)
+        if mixed and self._session_open and not self.data_mode:
+            # Ordinary voice/keypad operation resumes between screens; do not
+            # assume the terminal is still listening for FSK.
+            if not await self._alert():
+                self.uncertain = True
+                raise LinkFailure("voice-mode terminal did not confirm a new alert")
         pcm = audio.bell202(data)
         self.response_begin()
         if not await self._acknowledged(pcm):
+            if mixed:
+                # A missing reply also leaves its voice/data state uncertain.
+                # Never re-alert or advance to another screen on ambiguous input.
+                self.uncertain = True
+                raise LinkFailure("voice-mode frame acknowledgment is unresolved")
             # The default profile has no proven bound on an old D1. A retry
             # can confirm these bytes, but cannot authorize a different frame.
             await self._acknowledged(pcm)
             self.uncertain = True
             raise LinkFailure("retry left an outstanding acknowledgment")
         if open_input:
+            if mixed:
+                self.data_mode = False
             self._input_since = asyncio.get_running_loop().time()
 
     async def release(self) -> None:
-        if self.data_mode:
+        if self.display_active:
             await self.transfer(wire.RELEASE)
             self.data_mode = False
+            self._session_open = False
 
     async def accept_download(self) -> bool:
         self._input_since = None

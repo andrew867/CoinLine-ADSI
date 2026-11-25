@@ -20,7 +20,9 @@ public:
     std::array<std::string, 4> viewport() const;
     Softkey key(unsigned slot) const;
     bool inDataMode() const { return dataMode_; }
+    bool sessionOpen() const { return sessionOpen_; }
     bool released() const { return released_; }
+    std::array<uint8_t, 2> informationFlags() const { return informationFlags_; }
     const std::string &resident() const { return resident_; }
     unsigned residentVersion() const { return residentVersion_; }
     bool residentLaunch() const { return residentLaunch_; }
@@ -31,7 +33,9 @@ private:
 
     bool downloadEnabled_;
     bool dataMode_ = false;
+    bool sessionOpen_ = false;
     bool released_ = false;
+    std::array<uint8_t, 2> informationFlags_{};
     unsigned selectedLine_ = 1;
     std::unordered_map<unsigned, std::string> lines_;
     std::unordered_map<unsigned, Softkey> keys_;

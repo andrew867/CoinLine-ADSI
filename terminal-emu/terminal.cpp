@@ -151,7 +151,14 @@ bool Terminal::parameter(uint8_t tag, std::span<const uint8_t> payload)
         }
         selectedLine_ = payload[0] & 0x3f;
         return true;
+    case 0x84:
+        if (payload.size() != informationFlags_.size()) {
+            return false;
+        }
+        std::copy(payload.begin(), payload.end(), informationFlags_.begin());
+        return true;
     case 0x85:
+        sessionOpen_ = false;
         phase_ = 0;
         pendingDisplay_.clear();
         previousDownload_.clear();
@@ -163,13 +170,15 @@ bool Terminal::parameter(uint8_t tag, std::span<const uint8_t> payload)
         return payload.empty();
     case 0x87:
         dataMode_ = false;
-        released_ = true;
+        released_ = !sessionOpen_;
         return payload.size() == 1;
     case 0x88:
         keys_.clear();
         keyMap_.fill(0);
         return payload.empty();
     case 0x8e:
+        sessionOpen_ = true;
+        released_ = false;
         return payload.empty();
     case 0x94:
         lines_.clear();

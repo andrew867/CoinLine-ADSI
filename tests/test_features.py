@@ -41,7 +41,7 @@ class PublicProviderTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(caller=caller is not None, digits=digits):
                 link = AsyncMock()
-                link.data_mode = True
+                link.display_active = True
                 link.selection.side_effect = digits
                 self.assertEqual(await providers.choose_site(config, caller, link, AsyncMock()), expected)
                 self.assertEqual(link.transfer.await_count, len(digits))

@@ -27,6 +27,7 @@
     <label>Extension <input id="extension" inputmode="numeric" value="6501" maxlength="10"></label>
     <label>Test caller ID <input id="caller" inputmode="numeric" maxlength="10" placeholder="Optional" style="width:8rem" aria-label="Synthetic ten-digit InfoLine caller ID"></label>
     <button id="dial">Dial</button><button id="hangup">Hang up</button>
+    <button id="install">Install approved feature</button><button id="launch">InfoLine resident key</button>
   </div>
   <p id="status" aria-live="polite">Idle</p>
 </main>
@@ -42,7 +43,9 @@
   }
   for (const value of "123456789*0#") {
     const button = document.createElement("button");
-    button.textContent = value;
+    const letters = {2:"ABC",3:"DEF",4:"GHI",5:"JKL",6:"MNO",7:"PQRS",8:"TUV",9:"WXYZ"};
+    button.textContent = value + (letters[value] ? " " + letters[value] : "");
+    button.setAttribute("aria-label", value);
     button.onclick = () => send("/press", value);
     el("digits").appendChild(button);
   }
@@ -54,6 +57,8 @@
   }
   el("dial").onclick = () => send("/dial", el("extension").value.trim(), el("caller").value.trim());
   el("hangup").onclick = () => send("/press","hangup");
+  el("install").onclick = () => send("/resident","install");
+  el("launch").onclick = () => send("/resident","launch");
   async function poll() {
     try {
       const state = await (await fetch("/state",{cache:"no-store"})).json();

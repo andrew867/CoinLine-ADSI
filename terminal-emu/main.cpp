@@ -512,7 +512,8 @@ int main(int argc, char **argv)
             pj::Account account;
             account.create(config);
             for (long index = 0; index < repetitions; ++index) {
-                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host, extension == "6504");
+                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host,
+                                            extension == "6504" || extension == "6505");
                 std::cout << result.dump() << std::endl;
                 passed &= result["passed"].get<bool>();
                 if (index + 1 < repetitions) {

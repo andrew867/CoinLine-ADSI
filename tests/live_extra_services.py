@@ -12,7 +12,7 @@ def press(call, digit, expected):
     # The terminal reports its decoded frame before the D1 acknowledgment has completed.
     time.sleep(0.8)
     call.press(digit)
-    call.display(expected)
+    call.display(expected, timeout=30)
 
 
 def main():
@@ -22,7 +22,7 @@ def main():
         client.post('/session', json={'password': lab_value('ADSI_ADMIN_PASSWORD')}).raise_for_status()
         with provider_override(client, flights=False, directory=[{'name': 'Demo library', 'number': '7002', 'detail': 'Example only'}]):
             with terminal() as call:
-                call.display('COINLINE INFOLINE')
+                call.display('COINLINE INFOLINE', timeout=60)
                 press(call, '5', 'MORE SERVICES')
                 press(call, '1', 'AIRPORT BOARDS')
                 press(call, '1', 'Airport ?')

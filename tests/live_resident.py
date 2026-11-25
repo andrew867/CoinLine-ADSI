@@ -51,7 +51,7 @@ def main():
             _, restarted = dial(state_file, "resident")
             assert restarted == [{"idle_display": "INFOLINE", "version": 3, "launch_extension": "6501"}]
             with terminal(resident_state=state_file) as call:
-                call.display("COINLINE INFOLINE")
+                call.display("COINLINE INFOLINE", timeout=60)
         finally:
             original = prior.json()["value"]
             current = client.get("/features").raise_for_status()

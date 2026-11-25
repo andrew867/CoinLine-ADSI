@@ -10,6 +10,7 @@ values = {
     **{f"ADSI_{name}": secrets.token_hex(32) for name in
        ("SIP_PASSWORD", "ARI_PASSWORD", "ADMIN_PASSWORD", "DATABASE_PASSWORD", "DATABASE_ADMIN_PASSWORD", "DATA_KEY")},
     "ADSI_DEMO_PIN": f"{secrets.randbelow(10**8):08d}",
+    "ADSI_NATIVE_MAIL_PIN": f"{secrets.randbelow(10**8):08d}",
 }
 try:
     with path.open("x", encoding="utf-8") as target:

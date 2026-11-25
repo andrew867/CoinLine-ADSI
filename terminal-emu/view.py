@@ -25,20 +25,21 @@ class Dialer:
     def reset(self):
         self.state = {"lines": ["ON HOOK"], "keys": [""] * 6, "status": "Idle", "trace": [], "private": False}
 
-    def dial(self, ext, caller=""):
+    def dial(self, ext, caller="", scenario="interactive"):
         with self.lock:
             if self.call and self.call.poll() is None:
                 return False
             self.reset()
-            self.state["private"] = ext == "6504"
+            self.state["private"] = ext in ("6504", "6505")
             environment = dict(os.environ)
             environment.pop("ADSI_EMULATOR_CALLER_ID", None)
             if caller:
                 environment["ADSI_EMULATOR_CALLER_ID"] = caller
-            command = [self.binary, self.host, "interactive", ext] if self.binary else [
+            arguments = [self.host, scenario, *([ext] if scenario == "interactive" else [])]
+            command = [self.binary, *arguments] if self.binary else [
                 "docker", "compose", "--profile", "verify", "run", "--rm", "-T", "--no-deps",
                 *(["-e", "ADSI_EMULATOR_CALLER_ID"] if caller else []),
-                "terminal-emu", self.host, "interactive", ext,
+                "terminal-emu", *arguments,
             ]
             self.call = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                          stderr=subprocess.DEVNULL, text=True, encoding="utf-8", env=environment)
@@ -59,6 +60,8 @@ class Dialer:
                     self.state["lines"] = event["lines"]
                     self.state["keys"] = event["softkeys"]
                     self.state["status"] = event["mode"].capitalize()
+                if event.get("resident_version") and event.get("resident") and event.get("passed"):
+                    self.state["lines"] = [event["resident"], "Feature installed"]
                 if "sample" in event and not self.state["private"]:
                     self.state["trace"] = [*self.state["trace"][-31:], event]
         process.wait()
@@ -132,6 +135,9 @@ def main():
                     result = dialer.dial(value, caller)
                 elif self.path == "/press" and re.fullmatch(r"[0-9*#]|k[1-6]|hangup", value):
                     result = dialer.press(value)
+                elif self.path == "/resident" and value in ("install", "launch"):
+                    result = dialer.dial("6503" if value == "install" else "6501",
+                                         scenario="fdm" if value == "install" else "launch")
                 else:
                     raise ValueError
             except (ValueError, TypeError, AttributeError, OSError):

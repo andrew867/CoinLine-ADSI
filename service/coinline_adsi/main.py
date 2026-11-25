@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import fdm, graph
+from . import directory, fdm, flights, graph
 from .api import api, login
 from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
@@ -18,7 +18,7 @@ from .link import lab_call
 from .private import PrivateBalances, configure
 from .providers import Providers, choose_site, prefix
 from .regional import CAPITALS, choose, choose_weather
-from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, Store, StoreError
+from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, Store, StoreError
 
 
 @asynccontextmanager
@@ -56,7 +56,8 @@ async def lifespan(app: FastAPI):
             return
         if route == "resident-lab":
             requested = await store.take_download() if store and os.getenv("ADSI_FDM_ENABLE") == "1" else None
-            if not requested or not await fdm.install(link, requested["text"], requested["version"]):
+            if not requested or not await fdm.install(link, requested["text"], requested["version"],
+                                                      requested.get("launcher", False)):
                 await say("No resident download is available.")
             return
         revision = await store.route("infoline" if route in ("private-infoline", "private-lab-infoline") else route) if store else None
@@ -71,7 +72,13 @@ async def lifespan(app: FastAPI):
         resolved = False
         assistant_used = False
         document = revision["graph"]
-        if revision["id"] in (DEMO_REVISION, LEGACY_DEMO_REVISION) and not config.get("assistant"):
+        if revision["id"] == SERVICES_REVISION and not config.get("assistant"):
+            services = next(node for node in document["nodes"] if node["id"] == "services")
+            services["choices"] = [choice for choice in services["choices"] if choice["target"] != "help"]
+            services["lines"] = ["MORE SERVICES", "1 Flights", "2 Directory 0 Back"]
+            services["prompt"] = "More services. Press 1 for flights, 2 for directory, or 0 to return."
+            document["nodes"] = [node for node in document["nodes"] if node["id"] not in ("help", "help-result")]
+        elif revision["id"] in (DEMO_REVISION, LEGACY_DEMO_REVISION) and not config.get("assistant"):
             welcome = document["nodes"][0]
             welcome["choices"] = [choice for choice in welcome["choices"] if choice["digit"] != "5"]
             welcome["lines"][-1] = "0 Exit"
@@ -81,6 +88,16 @@ async def lifespan(app: FastAPI):
 
         async def prepare(operation, arguments):
             nonlocal location, inferred, resolved, assistant_used
+            if operation.startswith("airport."):
+                if arguments.get("airport") == "selected":
+                    code = await flights.choose(link, say)
+                    return {"airport": code} if code else None
+                return arguments
+            if operation == "directory.lookup":
+                if arguments.get("number") == "selected":
+                    number = await directory.choose(link, say, config)
+                    return {"number": number} if number else None
+                return arguments
             if regional and not resolved:
                 resolved = True
                 try:
@@ -165,6 +182,7 @@ async def lifespan(app: FastAPI):
             refresh_task.cancel()
             await asyncio.gather(refresh_task, return_exceptions=True)
         await app.state.providers.client.aclose()
+        app.state.providers.flights.close()
         if app.state.providers.regional:
             await app.state.providers.regional.close()
         if app.state.db:

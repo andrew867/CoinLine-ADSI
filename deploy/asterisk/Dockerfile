@@ -10,9 +10,13 @@ RUN curl -fsSLo asterisk.tar.gz "https://downloads.asterisk.org/pub/telephony/as
     && tar xzf asterisk.tar.gz --strip-components=1
 RUN ./configure --with-pjproject-bundled --without-dahdi --without-pri --without-binutils
 COPY deploy/asterisk/*.modules /build/
+COPY deploy/asterisk/native.modules.opt /build/
 COPY deploy/asterisk/app_coinline_reference.c apps/
 COPY --chmod=755 deploy/asterisk/select-modules.sh /build/
-RUN /build/select-modules.sh && menuselect/menuselect --enable OPTIONAL_API menuselect.makeopts
+ARG ADSI_NATIVE_MAIL=0
+RUN if [ "$ADSI_NATIVE_MAIL" = 1 ]; then cp /build/native.modules.opt /build/native.modules; fi \
+    && /build/select-modules.sh && menuselect/menuselect --enable OPTIONAL_API menuselect.makeopts \
+    && if [ "$ADSI_NATIVE_MAIL" = 1 ]; then menuselect/menuselect --enable CORE-SOUNDS-EN-WAV menuselect.makeopts; fi
 RUN make -j1 third-party
 RUN make -j6 -o third-party NOISY_BUILD=no && make -o third-party install DESTDIR=/image
 COPY --chmod=755 deploy/asterisk/build.sh /build/
@@ -44,3 +48,11 @@ COPY --from=source /profiles/reference/allowlist /opt/coinline/modules
 COPY --chown=asterisk:asterisk --from=source /image/var/lib/asterisk/ /var/lib/asterisk/
 USER asterisk
 CMD ["reference"]
+
+FROM runtime AS gateway-native
+COPY --from=source /image/usr/sbin/asterisk /usr/sbin/
+COPY --from=source /profiles/native/modules/ /usr/lib/asterisk/modules/
+COPY --from=source /profiles/native/allowlist /opt/coinline/modules
+COPY --chown=asterisk:asterisk --from=source /image/var/lib/asterisk/ /var/lib/asterisk/
+USER asterisk
+CMD ["native"]

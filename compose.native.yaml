@@ -1,0 +1,14 @@
+# Opt-in native Asterisk mailbox and visual directory. Default gateway remains minimal.
+services:
+  gateway:
+    image: ${ADSI_NATIVE_GATEWAY_IMAGE:-coinline-adsi-gateway-native}
+    build:
+      target: gateway-native
+      args:
+        ADSI_NATIVE_MAIL: "1"
+    environment:
+      ADSI_NATIVE_MAIL_PIN: ${ADSI_NATIVE_MAIL_PIN:?Run deploy/init_lab.py and configure the native mailbox}
+    volumes:
+      - native-mail:/var/spool/asterisk
+volumes:
+  native-mail: {}

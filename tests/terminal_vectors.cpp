@@ -53,6 +53,7 @@ int main()
     assert(terminal.apply(commit));
     assert(terminal.apply(commit));
     assert(terminal.resident() == "TEST" && terminal.residentVersion() == 1);
+    assert(!terminal.residentLaunch());
     connect.back() = 2;
     assert(terminal.apply(packet(0x85, 0x83, connect)));
     assert(terminal.apply(key));
@@ -60,4 +61,16 @@ int main()
     assert(terminal.apply(packet(0x84, 0x85, {})));
     assert(!terminal.apply(commit));
     assert(terminal.resident() == "TEST" && terminal.residentVersion() == 1);
+    assert(!terminal.residentLaunch());
+    assert(terminal.apply(packet(0x84, 0x86, {})));
+    assert(terminal.apply(packet(0x85, 0x83, connect)));
+    auto launchKey = packet(0x85, 0x80, {2,'I','n','f','o',255,'I','n','f','o',255,0x82,0x84,'6','5','0','1'});
+    auto invalidKey = packet(0x85, 0x80, {2,'I','n','f','o',255,'I','n','f','o',255,0x82,0x84,'6','5','0','2'});
+    assert(!terminal.apply(invalidKey));
+    assert(terminal.apply(launchKey));
+    assert(terminal.apply(screen));
+    assert(terminal.apply(script));
+    assert(!terminal.residentLaunch());
+    assert(terminal.apply(commit));
+    assert(terminal.residentLaunch() && terminal.residentVersion() == 2);
 }

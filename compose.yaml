@@ -35,6 +35,7 @@ services:
       ADSI_HEADLINEFEED_KEY: ${ADSI_HEADLINEFEED_KEY:-}
       ADSI_ALPHA_VANTAGE_KEY: ${ADSI_ALPHA_VANTAGE_KEY:-}
       ADSI_TWELVE_DATA_KEY: ${ADSI_TWELVE_DATA_KEY:-}
+      ADSI_AVIATIONSTACK_KEY: ${ADSI_AVIATIONSTACK_KEY:-}
       ADSI_PROVIDER_CACHE_DIR: /var/lib/coinline/providers
     volumes:
       - provider-cache:/var/lib/coinline/providers

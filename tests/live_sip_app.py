@@ -15,14 +15,15 @@ from live_api import DATA, lab_value
 
 
 class TerminalCall:
-    def __init__(self, extension, synthetic_caller=None):
+    def __init__(self, extension, synthetic_caller=None, resident_state=None):
         self.messages = queue.Queue()
         self.trace = []
         self.name = "coinline-adsi-test-" + uuid4().hex[:12]
         self.process = subprocess.Popen(
             ["docker", "compose", "--profile", "verify", "run", "--name", self.name, "--rm", "-T",
              "--no-deps", *(["-e", f"ADSI_EMULATOR_CALLER_ID={synthetic_caller}"] if synthetic_caller else []),
-             "terminal-emu", "gateway", "interactive", extension],
+             *(["-e", f"ADSI_FDM_STATE_FILE={resident_state}"] if resident_state else []),
+             "terminal-emu", "gateway", *(["launch"] if resident_state else ["interactive", extension])],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
         )
         threading.Thread(target=self._read, daemon=True).start()
@@ -53,8 +54,8 @@ class TerminalCall:
 
 
 @contextmanager
-def terminal(extension="6501", synthetic_caller=None):
-    call = TerminalCall(extension, synthetic_caller)
+def terminal(extension="6501", synthetic_caller=None, resident_state=None):
+    call = TerminalCall(extension, synthetic_caller, resident_state)
     try:
         yield call
     finally:

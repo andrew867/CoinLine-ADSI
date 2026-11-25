@@ -278,7 +278,11 @@ private:
         }
         const auto temporary = std::string(path) + ".pending";
         std::ofstream stream(temporary, std::ios::trunc);
-        stream << Json{{"version", terminal.residentVersion()}, {"idle_display", terminal.resident()}}.dump() << '\n';
+        Json state{{"version", terminal.residentVersion()}, {"idle_display", terminal.resident()}};
+        if (terminal.residentLaunch()) {
+            state["launch_extension"] = "6501";
+        }
+        stream << state.dump() << '\n';
         stream.close();
         if (!stream) {
             return false;
@@ -437,12 +441,26 @@ int main(int argc, char **argv)
         return 2;
     }
     const std::string host = argv[1];
-    const std::string scenario = argv[2];
+    std::string scenario = argv[2];
+    const bool launch = scenario == "launch";
+    if (launch) {
+        const char *path = std::getenv("ADSI_FDM_STATE_FILE");
+        if (!path || argc != 3) {
+            return 2;
+        }
+        std::ifstream stream(path);
+        const Json state = Json::parse(stream, nullptr, false);
+        if (!state.is_object() || !state.contains("version") || !state["version"].is_number_unsigned() ||
+            state["version"] == 0 || !state.contains("launch_extension") || state["launch_extension"] != "6501") {
+            return 1;
+        }
+        scenario = "interactive";
+    }
     if (scenario != "lab" && scenario != "reference" && scenario != "fallback" &&
         scenario != "interactive" && scenario != "fdm") {
         return 2;
     }
-    const std::string extension = argc == 4 ? argv[3] : (scenario == "fdm" ? "6503" : "6500");
+    const std::string extension = launch ? "6501" : argc == 4 ? argv[3] : (scenario == "fdm" ? "6503" : "6500");
     if (extension.empty() || extension.size() > 10 || extension.find_first_not_of("0123456789") != std::string::npos) {
         return 2;
     }
@@ -494,7 +512,8 @@ int main(int argc, char **argv)
             pj::Account account;
             account.create(config);
             for (long index = 0; index < repetitions; ++index) {
-                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host, extension == "6504");
+                const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host,
+                                            extension == "6504" || extension == "6505");
                 std::cout << result.dump() << std::endl;
                 passed &= result["passed"].get<bool>();
                 if (index + 1 < repetitions) {

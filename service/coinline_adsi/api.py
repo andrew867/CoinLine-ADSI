@@ -56,6 +56,7 @@ class Feature(BaseModel):
     text: str = Field(min_length=1, max_length=20)
     version: int = Field(ge=1, le=255)
     approved: bool = False
+    launcher: bool = False
 
 
 @dataclass
@@ -332,7 +333,7 @@ async def save_feature(value: Feature, response: Response, if_match: str | None 
     if value.approved and os.getenv("ADSI_FDM_ENABLE") != "1":
         raise HTTPException(409, "Resident download is disabled on this deployment.")
     try:
-        digest = fdm.fingerprint(value.text, value.version)
+        digest = fdm.fingerprint(value.text, value.version, value.launcher)
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
     return draft_response(response, await store.set_setting("fdm", etag(if_match), {**value.model_dump(), "sha256": digest}))

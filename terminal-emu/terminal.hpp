@@ -23,6 +23,7 @@ public:
     bool released() const { return released_; }
     const std::string &resident() const { return resident_; }
     unsigned residentVersion() const { return residentVersion_; }
+    bool residentLaunch() const { return residentLaunch_; }
 
 private:
     bool parameter(uint8_t tag, std::span<const uint8_t> payload);
@@ -39,6 +40,8 @@ private:
     unsigned phase_ = 0;
     unsigned pendingVersion_ = 0;
     unsigned residentVersion_ = 0;
+    bool pendingLaunch_ = false;
+    bool residentLaunch_ = false;
     std::string pendingDisplay_;
     std::string resident_;
 };

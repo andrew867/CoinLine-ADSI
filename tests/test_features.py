@@ -22,6 +22,9 @@ class ResidentArtifactTests(unittest.TestCase):
         self.assertNotEqual(fdm.fingerprint("RESIDENT LAB", 2), fdm.fingerprint("RESIDENT LAB", 3))
         with self.assertRaises(ValueError):
             fdm.artifact("newline\n", 2)
+        launcher = fdm.artifact("INFOLINE", 2, True)
+        self.assertIn(b"\x82\x846501", launcher[1])
+        self.assertNotEqual(fdm.fingerprint("INFOLINE", 2), fdm.fingerprint("INFOLINE", 2, True))
 
 
 class PublicProviderTests(unittest.IsolatedAsyncioTestCase):

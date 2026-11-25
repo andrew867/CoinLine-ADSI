@@ -48,8 +48,16 @@ bool Terminal::download(std::span<const uint8_t> frame)
         }
         pendingVersion_ = payload.back();
         pendingDisplay_.clear();
+        pendingLaunch_ = false;
         phase_ = 1;
-    } else if (frame[3] == 0x80 && phase_ == 1 && payload.size() == 14 && payload[0] == 2) {
+    } else if (frame[3] == 0x80 && phase_ == 1) {
+        constexpr std::array<uint8_t, 14> displayKey = {2,'I','n','f','o',255,'I','n','f','o',255,0x98,0xc1,8};
+        constexpr std::array<uint8_t, 17> launchKey = {2,'I','n','f','o',255,'I','n','f','o',255,0x82,0x84,'6','5','0','1'};
+        if (std::equal(payload.begin(), payload.end(), launchKey.begin(), launchKey.end())) {
+            pendingLaunch_ = true;
+        } else if (!std::equal(payload.begin(), payload.end(), displayKey.begin(), displayKey.end())) {
+            return false;
+        }
         phase_ = 2;
     } else if (frame[3] == 0x81 && phase_ == 2 && payload.size() >= 5 && payload.size() <= 24 &&
                payload[0] == 0x81 && payload[2] == 0xff && payload.back() == 0xff &&
@@ -65,6 +73,7 @@ bool Terminal::download(std::span<const uint8_t> frame)
     } else if (frame[3] == 0x84 && phase_ == 4 && payload.empty()) {
         resident_ = std::move(pendingDisplay_);
         residentVersion_ = pendingVersion_;
+        residentLaunch_ = pendingLaunch_;
         phase_ = 0;
     } else {
         return false;

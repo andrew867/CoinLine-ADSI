@@ -166,23 +166,28 @@ class PrivateBalances:
             await self.store._log(db, "bank_unlink", subject)
 
     async def call(self, caller, link, say, *, connected=False, expected_subject=None):
-        number = _number(caller)
-        enrolled = None if number is None else await self.store._one(
-            "SELECT subject, alias, sealed FROM bank_links WHERE phone_key=%s", (self.indexed("phone", number),))
-        if enrolled and expected_subject is not None and enrolled["subject"] != expected_subject:
-            enrolled = None
-        if enrolled is None or not (link.display_active if connected else await link.connect()):
+        if not (link.display_active if connected else await link.connect()):
             if connected:
                 await link.release()
             await say("Private balance service unavailable.")
             return
-        subject = enrolled["subject"]
+        number = _number(caller)
+        # The caller ID is only a lookup hint, never proof of identity. Render the same challenge
+        # and input flow for an unlinked or ineligible caller, but do not register a real approval.
+        enrolled = await self.store._one("SELECT subject, alias, sealed FROM bank_links WHERE phone_key=%s",
+                                         (self.indexed("phone", number or "unavailable"),))
+        if number is None or (enrolled and expected_subject is not None and enrolled["subject"] != expected_subject):
+            enrolled = None
         call = secrets.token_urlsafe(24)
-        try:
-            challenge = self.approvals.new(subject, call)
-        except ValueError:
-            await link.release()
-            return
+        registered = False
+        if enrolled:
+            try:
+                challenge = self.approvals.new(enrolled["subject"], call)
+                registered = True
+            except ValueError:
+                challenge = self.approvals.challenge()
+        else:
+            challenge = self.approvals.challenge()
         approved = False
         try:
             await link.transfer(wire.screen(["PRIVATE BALANCE", f"Approval {challenge}", "Confirm on web", "Enter approval code"], []),
@@ -190,14 +195,15 @@ class PrivateBalances:
             async with asyncio.timeout(120):
                 for _ in range(3):
                     code = "".join([await link.selection(60) for _ in range(8)])
-                    if self.approvals.check(challenge, call, code):
+                    if registered and self.approvals.check(challenge, call, code):
                         approved = True
                         break
         except TimeoutError:
             pass
         finally:
-            self.approvals.pending.pop(challenge, None)
-        if approved:
+            if registered:
+                self.approvals.pending.pop(challenge, None)
+        if approved and enrolled:
             deadline = asyncio.get_running_loop().time() + 300
             try:
                 balance = await self._balance(enrolled)

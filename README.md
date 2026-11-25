@@ -1,6 +1,23 @@
 # CoinLine ADSI
 
+[![Verification](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml/badge.svg)](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml)
+
 CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine** presents Canadian regional headlines, weather, stock quotes and lottery draw results, with fixture, live or manual provenance as configured. Read-only banking is optional. Operators can build and test call flows in a browser. A standalone PJSUA2 terminal exercises signaling over SIP/RTP.
+
+## Quick start
+
+Install Docker with Compose and Python 3.11 or later. On Windows, run the commands from MSYS2 MINGW64.
+
+```sh
+git clone https://github.com/andrew867/CoinLine-ADSI.git
+cd CoinLine-ADSI
+python deploy/init_lab.py
+docker compose --profile verify build
+docker compose --profile verify up -d --no-build --wait app gateway reference
+python terminal-emu/view.py
+```
+
+Open the operator console at `http://127.0.0.1:8080` and sign in with the generated `ADSI_ADMIN_PASSWORD` in the ignored `.env` file. Open the SIP terminal at `http://127.0.0.1:8091` and dial **6501** for InfoLine. The default configuration uses synthetic provider data. Live Canadian feeds, optional SimpleFIN enrollment and the private local calling route are documented in [Run the lab](docs/plan/running.md).
 
 ## Design package
 
@@ -20,6 +37,4 @@ CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine
 | [Fixtures](fixtures/README.md) | Synthetic wire vectors, application graph and provider examples |
 | [Sources](docs/sources.md) | Primary references, implementation evidence and unresolved questions |
 
-The local software lab has verified the gateway and native Asterisk ADSI exchanges over SIP/RTP. Nortel Vista 350 and ADSI-capable Millennium support badges each require a separate physical qualification.
-
-This directory is organized to become the root of an independent repository.
+The local software lab has verified the gateway and native Asterisk ADSI exchanges over SIP/RTP. Nortel Vista 350 and ADSI-capable Millennium support badges each require a separate physical qualification. Container release publishing requires an explicit project license and the deployment workflows require qualified target environments.

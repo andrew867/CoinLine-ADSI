@@ -21,6 +21,9 @@ services:
       ADSI_EMU_INTERACTION_PROFILE: ${ADSI_EMU_INTERACTION_PROFILE:-continuous-data}
       ADSI_LOCAL_BANK_ENROLLMENT: "0"
       ADSI_LOCAL_PRIVATE_CALLS: "0"
+      ADSI_SHADYBANK_MODE: "disabled"
+      ADSI_SHADYBANK_SERVICE_KEY: ""
+      ADSI_SHADYBANK_URL: ""
       ADSI_SIP_BIND: "127.0.0.1"
     ports: !override
       - "127.0.0.1:${ADSI_EMU_WEB_PORT:-8089}:8080"

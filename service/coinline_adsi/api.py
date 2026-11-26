@@ -382,6 +382,8 @@ async def routes(store=Depends(database)):
 async def telephony_status(request: Request):
     gateway = request.app.state.gateway
     status = gateway.status() if gateway else {"ready": False, "active": 0}
+    status["shadybank"] = ("demo" if request.app.state.shadybank_demo else
+                           "live" if request.app.state.shadybank is not None else "disabled")
     if gateway and os.getenv("ADSI_EMU_ENABLE") == "1":
         status["emulatorIngress"] = {"uri": "sip:2374@127.0.0.1:5069", "fromUser": "co",
                                      "firstAlertMs": round(gateway.first_alert_delay("emu-infoline") * 1000),

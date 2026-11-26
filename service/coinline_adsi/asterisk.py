@@ -18,7 +18,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
 from . import audio
-from .link import CONTINUOUS_DATA, LAB_PROMPTS, PROFILES, Link, LinkFailure
+from .link import CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS, LAB_PROMPTS, PROFILES, Link, LinkFailure
 
 
 LOG = logging.getLogger(__name__)
@@ -85,10 +85,11 @@ CallHandler = Callable[[str, str | None, Link, Callable[[str], Awaitable[None]]]
 
 class Gateway:
     def __init__(self, base: str, password: str, handler: CallHandler, limit: int = 10,
-                 emu_alert_delay: float = 1.0, emu_interaction_profile: str = CONTINUOUS_DATA):
+                 emu_alert_delay: float = 1.0, emu_interaction_profile: str = CONTINUOUS_DATA,
+                 shadybank_profile: str = VOICE_BETWEEN_SCREENS):
         if not 0.25 <= emu_alert_delay <= 5.0:
             raise ValueError("Emulator first-alert delay must be 250 to 5000 ms.")
-        if emu_interaction_profile not in PROFILES:
+        if emu_interaction_profile not in PROFILES or shadybank_profile not in PROFILES:
             raise ValueError("Unknown emulator interaction profile.")
         self.base = base.rstrip("/")
         self.authorization = "Basic " + base64.b64encode(f"{APP}:{password}".encode()).decode()
@@ -97,6 +98,7 @@ class Gateway:
         self.limit = limit
         self.emu_alert_delay = emu_alert_delay
         self.emu_interaction_profile = emu_interaction_profile
+        self.shadybank_profile = shadybank_profile
         self.connected = False
         self.calls: dict[str, Admission] = {}
         self.pending: dict[str, Admission] = {}
@@ -108,6 +110,8 @@ class Gateway:
         return self.emu_alert_delay if route == "emu-infoline" else 0.25
 
     def interaction_profile(self, route: str) -> str:
+        if route == "shadybank":
+            return self.shadybank_profile
         return self.emu_interaction_profile if route == "emu-infoline" else CONTINUOUS_DATA
 
     def status(self):

@@ -29,7 +29,7 @@ type Simulation = {
 type Settings = { value: Record<string, unknown>; generation: number };
 type Feature = { text: string; version: number; approved: boolean; launcher: boolean; sha256?: string };
 type Route = { name: string; revision_id: string | null };
-type Telephony = { ready: boolean; active: number; emulatorIngress?: { uri: string; fromUser: string; firstAlertMs: number } };
+type Telephony = { ready: boolean; active: number; shadybank?: "demo" | "live" | "disabled"; emulatorIngress?: { uri: string; fromUser: string; firstAlertMs: number } };
 type Point = { x: number; y: number };
 
 const operations: Record<string, string> = {
@@ -200,7 +200,8 @@ function App() {
           <dt>First ADSI alert</dt><dd>{telephony.emulatorIngress.firstAlertMs} ms after media bridge</dd>
         </>}
         <dt>6500</dt><dd>ADSI lab exchange</dd>
-        <dt>6501</dt><dd>{routes[0]?.revision_id ? "Published InfoLine revision" : "No active application"}</dd></dl></section>
+        <dt>6501</dt><dd>{routes[0]?.revision_id ? "Published InfoLine revision" : "No active application"}</dd>
+        <dt>6508</dt><dd>ShadyBank member banking ({telephony?.shadybank ?? "disabled"}, authenticated SIP)</dd></dl></section>
       <section className="panel"><h2>Data providers</h2>
         <label>Provider configuration<textarea rows={15} value={configuration} spellCheck={false}
           onChange={(event) => setConfiguration(event.target.value)} /></label>

@@ -38,6 +38,8 @@ jobs:
           python tests/live_api.py
           python tests/live_sip_app.py
           python tests/live_balance_demo.py
+          ADSI_SHADYBANK_MODE=demo docker compose up -d --no-deps --wait app
+          PYTHONPATH=service python tests/live_shadybank.py
           PYTHONPATH=service python tests/live_extra_services.py
           ADSI_FDM_ENABLE=1 docker compose up -d --no-deps --wait app
           python tests/live_resident.py

@@ -61,3 +61,4 @@ class EmulatorIngressTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('coinline-adsi-emu_db', overlay)
         self.assertIn('ADSI_LOCAL_PRIVATE_CALLS: "0"', overlay)
         self.assertIn('ADSI_LOCAL_BANK_ENROLLMENT: "0"', overlay)
+        self.assertIn('ADSI_SHADYBANK_MODE: "disabled"', overlay)

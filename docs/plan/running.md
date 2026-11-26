@@ -17,6 +17,7 @@ The initializer creates an ignored `.env` with generated lab credentials. The we
 | 6502 | Synthetic balance demonstration, gated by `ADSI_DEMO_PIN` |
 | 6503 | Resident feature lab route, enabled with `ADSI_FDM_ENABLE=1` and a one-shot approval |
 | 6504 | Private local InfoLine test, enabled with `ADSI_LOCAL_PRIVATE_CALLS=1` and local banking enrollment |
+| 6508 | Optional ShadyBank member banking, authenticated lab SIP only; see [ShadyBank setup](shadybank.md) |
 
 ```sh
 sh tests/check-modules.sh

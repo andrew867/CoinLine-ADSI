@@ -26,6 +26,8 @@ ARGUMENTS = {
     "airport.arrivals": ({"airport"}, set()),
     "airport.departures": ({"airport"}, set()),
     "directory.lookup": ({"number"}, set()),
+    "cinema.showtimes": ({"selection"}, set()),
+    "parcel.track": ({"number"}, set()),
 }
 OUTPUTS = {
     "weather.current": {"place", "temperatureText", "localTime", "displayTitle", "source"},
@@ -37,6 +39,8 @@ OUTPUTS = {
     **{operation: {"displayTitle", "direction", "source", "updated", *(f"flight{i}" for i in range(1, 6))}
        for operation in ("airport.arrivals", "airport.departures")},
     "directory.lookup": {"name", "number", "detail", "source", "displayTitle"},
+    "cinema.showtimes": {"displayTitle", "theatre", "movie", "date", "source", *(f"times{i}" for i in range(1, 7))},
+    "parcel.track": {"displayTitle", "status", "updated", "estimate", "source"},
 }
 
 
@@ -107,7 +111,7 @@ def validate(graph: dict) -> list[dict]:
             if "{{" in TOKEN.sub("", template) or "}}" in TOKEN.sub("", template):
                 issue(node, "Template syntax is invalid.")
         if node["type"] in ("menu", "message") and not any(TOKEN.search(line) for line in node["lines"]):
-            if len(pages(node["lines"])) > 1 and len(digits) > 4:
+            if len(screen_pages(node, node["lines"])) > 1 and len(digits) > 4:
                 issue(node, "A paged screen can use up to four choices.")
     if errors:
         return errors[:20]
@@ -159,6 +163,21 @@ def pages(lines: list[str]) -> list[list[str]]:
     return [wrapped[index:index + 4] for index in range(0, len(wrapped), 4)]
 
 
+def screen_pages(node: dict, lines: list[str]) -> list[list[str]]:
+    """Information screens retain their title and show page progress, without empty data rows."""
+    if node.get("layout") != "information":
+        return pages(lines)
+    rows = [row for line in lines for row in textwrap.wrap(handset_text(line), width=20)]
+    if not rows:
+        return [["Unavailable"]]
+    if len(rows) <= 4:
+        return [rows]
+    title, body = rows[0], rows[1:]
+    count = (len(body) + 1) // 2
+    return [[title, *body[i:i+2], *([" "] if len(body[i:i+2]) == 1 else []), f"Page {i//2+1}/{count}"]
+            for i in range(0, len(body), 2)]
+
+
 Lookup = Callable[[str, dict[str, str]], Awaitable[dict[str, str] | None]]
 
 
@@ -197,7 +216,8 @@ class Session:
             result = None
             if arguments is not None:
                 try:
-                    timeout = (12 if current["operation"].startswith("airport.") else
+                    timeout = (20 if current["operation"] in ("cinema.showtimes", "parcel.track") else
+                               12 if current["operation"].startswith("airport.") else
                                5 if current["operation"] == "assistant.answer" else provider_timeout)
                     async with asyncio.timeout(timeout):
                         result = await lookup(current["operation"], arguments)
@@ -217,7 +237,7 @@ class Session:
         prompt = self._format(current.get("prompt", ""))
         if current["type"] == "end" or self.ended:
             return {"node": self.node, "lines": [], "choices": [], "prompt": prompt, "ended": True}
-        screens = pages([self._format(line) for line in current.get("lines", [])]) or [["Unavailable"]]
+        screens = screen_pages(current, [self._format(line) for line in current.get("lines", [])]) or [["Unavailable"]]
         options = [{"digit": item["digit"], "label": handset_text(item["label"])[:7]} for item in choices(current)]
         if len(screens) > 1:
             if len(options) > 4:
@@ -227,6 +247,21 @@ class Session:
                 options.append({"digit": "7", "label": "Prev"})
             if self.index + 1 < len(screens):
                 options.append({"digit": "9", "label": "Next"})
+        if current.get("layout") == "information" and len(options) <= 6:
+            # Keep paging and return keys in fixed positions. The viewport never lists them.
+            ordinary_slots = iter((1, 2, 3, 6) if len(screens) > 1 else range(1, 7))
+            for option in options:
+                if option["digit"] == "7":
+                    option["slot"] = 4
+                elif option["digit"] == "9":
+                    option["slot"] = 5
+                elif option["digit"] == "0":
+                    option["slot"] = 6
+                else:
+                    option["slot"] = next(ordinary_slots)
+            if len({option["slot"] for option in options}) != len(options):
+                for option in options:
+                    option.pop("slot", None)
         return {"node": self.node, "lines": screens[self.index], "choices": options, "prompt": prompt,
                 "page": self.index + 1, "pageCount": len(screens), "ended": False}
 
@@ -264,11 +299,16 @@ async def run_call(graph: dict, lookup: Lookup, link: Link, say, prepare=None, p
             return
         if display:
             await link.transfer(wire.screen(view["lines"], [(item["label"], item["digit"])
-                                                             for item in view["choices"]]), open_input=True)
+                                                             for item in view["choices"]],
+                                            slots=[item.get("slot", index + 1) for index, item in enumerate(view["choices"])]), open_input=True)
         else:
             navigation = {"7": "Press seven for the previous page.", "9": "Press nine for the next page."}
             link.open_voice_input()
-            await say(" ".join([view["prompt"], *(navigation.get(item["digit"], "") for item in view["choices"])]))
+            if session.nodes[session.node].get("layout") == "information" and view["pageCount"] > 1:
+                await say(". ".join([*view["lines"], *(navigation.get(item["digit"]) or
+                    f"Press {item['digit']} for {item['label']}" for item in view["choices"])]))
+            else:
+                await say(" ".join([view["prompt"], *(navigation.get(item["digit"], "") for item in view["choices"])]))
         deadline = asyncio.get_running_loop().time() + 60
         try:
             while not session.choose(await link.selection(max(0, deadline - asyncio.get_running_loop().time()))):

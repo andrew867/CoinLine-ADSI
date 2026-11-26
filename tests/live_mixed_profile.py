@@ -21,15 +21,46 @@ def run(network, image, profile):
     threading.Thread(target=read_messages, args=(process, messages), daemon=True).start()
     mode = 'voice' if profile == 'voice-between-screens' else 'data'
 
-    def screen(line):
+    screens_seen = 0
+
+    def screen(line, *, page=None):
+        nonlocal screens_seen
         expect_event(messages, lambda e: e.get('valid') and e.get('line') == line and
-                     e.get('mode') == mode and e.get('session') is True, f'{line} in {mode} mode')
+                     e.get('mode') == mode and e.get('session') is True and
+                     (page is None or e.get('lines', [''])[-1].startswith(page)), f'{line} in {mode} mode')
+        screens_seen += 1
 
     try:
         screen('COINLINE INFOLINE')
         press(process, '1')
         screen('NEWS')
         press(process, '0')
+        screen('COINLINE INFOLINE')
+        press(process, '5')
+        screen('MORE SERVICES')
+        press(process, '4')
+        screen('Demo theatre')
+        press(process, 'k1')
+        screen('Demo movie')
+        press(process, 'k1')
+        screen('DEMO MOVIES', page='Page 1/')
+        press(process, 'k5')
+        screen('DEMO MOVIES', page='Page 2/')
+        press(process, 'k4')
+        screen('DEMO MOVIES', page='Page 1/')
+        press(process, 'k6')
+        screen('MORE SERVICES')
+        press(process, '5')
+        screen('TRACK A PARCEL')
+        for digit in '000000000001':
+            press(process, digit)
+        press(process, 'k5')
+        screen('CONFIRM TRACKING')
+        press(process, 'k1')
+        screen('DEMO FEDEX')
+        press(process, 'k6')
+        screen('MORE SERVICES')
+        press(process, 'k6')
         screen('COINLINE INFOLINE')
         # The welcome has Exit in position six; test the return-string path too.
         press(process, 'k6')
@@ -47,10 +78,10 @@ def run(network, image, profile):
         assert report['sip_status'] == 200 and report['passed'], report
         events = report['events']
         assert not any(e.get('valid') is False for e in events), report
-        expected_alerts = 4 if mode == 'voice' else 1
+        expected_alerts = screens_seen + 1 if mode == 'voice' else 1
         assert sum(e.get('signal') == 'CAS' for e in events) == expected_alerts, report
         assert sum(e.get('digit') == 'A' for e in events) == expected_alerts, report
-        assert sum(e.get('digit') == 'D' for e in events) == 5, report
+        assert sum(e.get('digit') == 'D' for e in events) == screens_seen + 2, report
         print(f'PASS: {profile}, {expected_alerts} genuine peer capability exchanges, keypad/softkey navigation and release')
     finally:
         if process.poll() is None:

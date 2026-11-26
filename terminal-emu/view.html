@@ -16,12 +16,25 @@
   #keys { grid-template-columns:repeat(6,1fr) }
   #digits { grid-template-columns:repeat(3,1fr) }
   #keys button { font-size:.75rem; padding:.3rem }
+  .graphical #screen-panel { display:grid; grid-template-columns:minmax(3rem,1fr) minmax(8rem,4fr) minmax(3rem,1fr); gap:.35rem }
+  .graphical #display { grid-column:2; grid-row:1/4; font-size:clamp(.7rem,2.1vw,1rem); padding:.35rem; min-width:0; overflow-wrap:anywhere }
+  .graphical #keys { display:contents }
+  .graphical #keys button:nth-child(1) { grid-column:1; grid-row:1 }
+  .graphical #keys button:nth-child(2) { grid-column:1; grid-row:2 }
+  .graphical #keys button:nth-child(3) { grid-column:1; grid-row:3 }
+  .graphical #keys button:nth-child(4) { grid-column:3; grid-row:1 }
+  .graphical #keys button:nth-child(5) { grid-column:3; grid-row:2 }
+  .graphical #keys button:nth-child(6) { grid-column:3; grid-row:3 }
+  .graphical #keys button { padding:.2rem; font-size:.72rem; overflow:hidden; text-overflow:ellipsis }
   pre { overflow:auto; font-size:.8rem; white-space:pre-wrap }
 </style>
 <h1>CoinLine SIP Terminal</h1>
-<main>
+<main class="graphical" id="terminal">
+  <label>Terminal layout <select id="layout"><option value="graphical">Graphical side keys</option><option value="screenphone">Screenphone bottom keys</option></select></label>
+  <div id="screen-panel">
   <output id="display" aria-label="Terminal display" aria-live="polite">ON HOOK</output>
   <div id="keys" aria-label="Softkeys"></div>
+  </div>
   <div id="digits" aria-label="Keypad"></div>
   <div class="controls">
     <label>Extension <input id="extension" inputmode="numeric" value="6501" maxlength="10"></label>
@@ -34,6 +47,7 @@
 <details id="trace-panel"><summary>Signal trace</summary><pre id="trace"></pre></details>
 <script>
   const el = (id) => document.getElementById(id);
+  el("layout").onchange = () => el("terminal").className = el("layout").value;
   async function send(path, value, caller) {
     const response = await fetch(path, {
       method:"POST", headers:{"X-Coinline-Terminal":"local","Content-Type":"application/json"},

@@ -29,6 +29,10 @@ test("author and simulate an InfoLine application", async ({ page }) => {
 
   await page.getByRole("button", { name: "Run draft" }).click();
   await expect(page.getByLabel("Terminal display")).toContainText("LOCAL INFOLINE");
+  await expect(page.getByLabel("Terminal layout")).toHaveValue("graphical");
+  await page.getByLabel("Terminal layout").selectOption("screenphone");
+  await expect(page.locator('.phone')).toHaveClass(/screenphone/);
+  await page.getByLabel("Terminal layout").selectOption("graphical");
   await page.getByRole("button", { name: "Wx", exact: true }).click();
   await expect(page.getByLabel("Terminal display")).toContainText("DEMO WEATHER");
   await expect(page.getByLabel("Terminal display")).toContainText("Demo Harbour");

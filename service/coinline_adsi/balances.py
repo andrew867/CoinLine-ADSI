@@ -249,13 +249,15 @@ async def show_transactions(link, transactions, *, authorize=None, deadline=None
             await authorize()
         if remaining() <= 0:
             return
-        await link.transfer(wire.screen(["NO RECENT ACTIVITY", "0 Exit"], [("Exit", "0")]), open_input=True)
+        await link.transfer(wire.screen(["NO RECENT ACTIVITY", "No posted entries"], [("Exit", "0")], slots=[6]), open_input=True)
         try:
             await link.selection(max(0, remaining()))
         except TimeoutError:
             pass
         return
-    for index, record in enumerate(transactions):
+    index = 0
+    for _ in range(80):
+        record = transactions[index]
         if authorize:
             await authorize()
         if remaining() <= 0:
@@ -263,12 +265,19 @@ async def show_transactions(link, transactions, *, authorize=None, deadline=None
         amount = f"{record.currency} {record.amount}"
         lines = [f"ACTIVITY {index + 1}/{len(transactions)}", record.posted.strftime("%d %b %Y"),
                  amount if len(amount) <= 20 else "Amount unavailable", handset_text(record.description)[:20] or "Transaction"]
-        keys = [("Exit", "0")]
+        keys, slots = [("Exit", "0")], [6]
+        if index:
+            keys.append(("Prev", "7")); slots.append(4)
         if index + 1 < len(transactions):
-            keys.append(("Next", "9"))
-        await link.transfer(wire.screen(lines, keys), open_input=True)
+            keys.append(("Next", "9")); slots.append(5)
+        await link.transfer(wire.screen(lines, keys, slots=slots), open_input=True)
         try:
-            if await link.selection(max(0, remaining())) != "9":
+            digit = await link.selection(max(0, remaining()))
+            if digit == "9" and index + 1 < len(transactions):
+                index += 1
+            elif digit == "7" and index:
+                index -= 1
+            elif digit == "0":
                 return
         except TimeoutError:
             return
@@ -302,7 +311,8 @@ async def demo_balance(link: Link, say, access_code: str, *, connected=False, tr
             break
     if display and verified:
         keys = [("Exit", "0"), ("Trans", "1")] if transactions else [("Exit", "0")]
-        await link.transfer(wire.screen(["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "1 Trans  0 Exit" if transactions else "0 Exit"], keys),
+        await link.transfer(wire.screen(["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "Example account"], keys,
+                                        slots=[6,1] if transactions else [6]),
                             open_input=True)
         try:
             if await link.selection(20) == "1" and transactions:

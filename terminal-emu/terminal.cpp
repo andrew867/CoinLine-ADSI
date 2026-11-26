@@ -122,7 +122,7 @@ bool Terminal::parameter(uint8_t tag, std::span<const uint8_t> payload)
         }
         auto action = std::find(label + 1, payload.end(), 0xff);
         if (action == payload.end() || payload.end() - action != 2 ||
-            action[1] < '0' || action[1] > '9') {
+            ((action[1] < '0' || action[1] > '9') && action[1] != '*' && action[1] != '#')) {
             return false;
         }
         keys_[payload.front()] = {std::string(payload.begin() + 1, label), static_cast<char>(action[1])};

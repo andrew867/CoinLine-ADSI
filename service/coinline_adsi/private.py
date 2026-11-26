@@ -216,8 +216,8 @@ class PrivateBalances:
                 if balance.available is not None:
                     rows.extend(["Available", available])
                 else:
-                    rows.extend([enrolled["alias"], "0 Exit"])
-                await link.transfer(wire.screen(rows, [("Exit", "0"), ("Trans", "1")]), open_input=True)
+                    rows.append(enrolled["alias"])
+                await link.transfer(wire.screen(rows, [("Exit", "0"), ("Trans", "1")], slots=[6,1]), open_input=True)
                 try:
                     if await link.selection(60) == "1":
                         from .balances import show_transactions

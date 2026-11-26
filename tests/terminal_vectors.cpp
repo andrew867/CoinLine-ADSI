@@ -28,6 +28,12 @@ int main()
     assert(mixed.apply(packet(0x84, 0x87, {0})));
     assert(!mixed.sessionOpen() && mixed.released());
 
+    Terminal controls;
+    assert(controls.apply(packet(0x84, 0x80, {19,'E','r','a','s','e',255,'E','r','a','s','e',255,'*'})));
+    assert(controls.apply(packet(0x84, 0x80, {20,'S','u','b','m','i','t',255,'S','u','b','m','i','t',255,'#'})));
+    assert(controls.apply(packet(0x84, 0x81, {1,1,1,19,20,1})));
+    assert(!controls.key(0).digit && controls.key(3).digit == '*' && controls.key(4).digit == '#');
+
     Terminal terminal(true);
     const std::vector<uint8_t> lab {0x84, 0x0d, 0x01, 0x82, 0x07, 0x01, 0x40, 0xff, 0x4c, 0x41,
                                    0x42, 0xff, 0x83, 0x01, 0x01, 0x52};

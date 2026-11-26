@@ -39,14 +39,14 @@ def select_line(number: int) -> bytes:
 
 
 def softkey(key: int, label: str, digit: str) -> bytes:
-    if not 16 <= key <= 33 or len(digit) != 1 or digit not in "0123456789":
+    if not 16 <= key <= 33 or len(digit) != 1 or digit not in "0123456789*#":
         raise ValueError("invalid softkey binding")
     short = label[:7]
     return parameter(0x80, bytes((key,)) + _text(label, 18) + b"\xff" + _text(short, 7) + b"\xff" + digit.encode())
 
 
 def key_map(keys: list[int]) -> bytes:
-    if len(keys) > 6 or any(not 16 <= key <= 33 for key in keys):
+    if len(keys) > 6 or any(key != 1 and not 16 <= key <= 33 for key in keys):
         raise ValueError("invalid softkey map")
     return parameter(0x81, bytes([*keys, *([1] * (6 - len(keys)))]))
 
@@ -69,17 +69,22 @@ def finish_in_voice(data: bytes) -> bytes:
     return frame(data[3:-1], VOICE_MODE)
 
 
-def screen(lines: list[str], choices: list[tuple[str, str]], *, information: bytes | None = None) -> bytes:
+def screen(lines: list[str], choices: list[tuple[str, str]], *, information: bytes | None = None,
+           slots: list[int] | None = None) -> bytes:
     if not 1 <= len(lines) <= 4:
         raise ValueError("invalid viewport height")
-    keys = [softkey(16 + index, label, digit) for index, (label, digit) in enumerate(choices)]
+    slots = list(range(1, len(choices) + 1)) if slots is None else slots
+    if len(slots) != len(choices) or len(set(slots)) != len(slots) or not all(1 <= slot <= 6 for slot in slots):
+        raise ValueError("invalid physical softkey slots")
+    keys = [softkey(15 + slot, label, digit) for slot, (label, digit) in zip(slots, choices)]
+    mapping = [15 + slot if slot in slots else 1 for slot in range(1, 7)]
     return frame(
         parameter(0x94),
         parameter(0x88),
         *(display_line(index, line) for index, line in enumerate(lines, 1)),
         select_line(1),
         *keys,
-        key_map(list(range(16, 16 + len(keys)))),
+        key_map(mapping),
         *([information_flags(information)] if information is not None else []),
     )
 

@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import directory, fdm, flights, graph
+from . import directory, fdm, flights, graph, parcel
 from .api import api, login
 from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
@@ -18,7 +18,7 @@ from .link import CONTINUOUS_DATA, lab_call
 from .private import PrivateBalances, configure
 from .providers import Providers, choose_site, prefix
 from .regional import CAPITALS, choose, choose_weather
-from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, Store, StoreError
+from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, SCREENPHONE_REVISION, Store, StoreError
 
 
 @asynccontextmanager
@@ -75,11 +75,14 @@ async def lifespan(app: FastAPI):
         resolved = False
         assistant_used = False
         document = revision["graph"]
-        if revision["id"] == SERVICES_REVISION and not config.get("assistant"):
+        if revision["id"] in (SERVICES_REVISION, SCREENPHONE_REVISION) and not config.get("assistant"):
             services = next(node for node in document["nodes"] if node["id"] == "services")
             services["choices"] = [choice for choice in services["choices"] if choice["target"] != "help"]
-            services["lines"] = ["MORE SERVICES", "1 Flights", "2 Directory 0 Back"]
-            services["prompt"] = "More services. Press 1 for flights, 2 for directory, or 0 to return."
+            if revision["id"] == SERVICES_REVISION:
+                services["lines"] = ["MORE SERVICES", "1 Flights", "2 Directory 0 Back"]
+                services["prompt"] = "More services. Press 1 for flights, 2 for directory, or 0 to return."
+            else:
+                services["prompt"] = "More services. Press 1 for flights, 2 for directory, 4 for movies, 5 for parcels, or 0 to return."
             document["nodes"] = [node for node in document["nodes"] if node["id"] not in ("help", "help-result")]
         elif revision["id"] in (DEMO_REVISION, LEGACY_DEMO_REVISION) and not config.get("assistant"):
             welcome = document["nodes"][0]
@@ -101,6 +104,12 @@ async def lifespan(app: FastAPI):
                     number = await directory.choose(link, say, config)
                     return {"number": number} if number else None
                 return arguments
+            if operation == "parcel.track" and arguments.get("number") == "selected":
+                live_parcel = config.get("parcel", False)
+                if live_parcel and not providers.parcel.configured():
+                    return None
+                number = await parcel.collect(link, say, demo=not live_parcel)
+                return {"number": number} if number else None
             if regional and not resolved:
                 resolved = True
                 try:
@@ -108,6 +117,12 @@ async def lifespan(app: FastAPI):
                         inferred = await regional.location(prefix(caller))
                 except TimeoutError:
                     pass
+            if operation == "cinema.showtimes" and arguments.get("selection") == "selected":
+                enabled = providers.cinema_enabled(config)
+                if enabled and not regional:
+                    return None
+                selection = await providers.cinema.prepare(link, say, inferred, enabled)
+                return {"selection": selection} if selection else None
             if operation.startswith("weather.") and arguments.get("site") == "selected":
                 if location is None:
                     location = (await choose_weather(link, say, inferred) if regional and not config.get("sites")

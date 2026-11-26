@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import re
+import time
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import datetime, UTC
@@ -13,6 +14,8 @@ from urllib.parse import urlsplit
 from uuid import uuid4
 
 import httpx
+import psycopg
+from psycopg_pool import PoolTimeout
 
 from . import graph, wire
 
@@ -24,6 +27,8 @@ MONEY = re.compile(r'-?(?:0|[1-9][0-9]{0,5})\.[0-9]{2}')
 DEMO_CARD = '9000000000000001'
 DEMO_RECIPIENT = '9000000000000002'
 DEMO_PIN = '123456'
+PIN_ATTEMPTS = 3
+PIN_COOLDOWN = 600
 
 
 class Rejected(RuntimeError):
@@ -36,6 +41,101 @@ class Unavailable(RuntimeError):
 
 class UnknownTransfer(RuntimeError):
     pass
+
+
+def card_key(key, pan):
+    # A database record cannot expose the submitted card number.
+    return hmac.digest(key, b'shadybank-pin-lockout\0' + pan.encode('ascii'), 'sha256')
+
+
+class MemoryPinGate:
+    """A bounded synthetic fixture gate, for clients without a database."""
+    def __init__(self, clock=time.monotonic):
+        self.key = os.urandom(32)
+        self.clock = clock
+        self.entries = {}
+        self.lock = asyncio.Lock()
+
+    async def reserve(self, pan):
+        key = card_key(self.key, pan)
+        async with self.lock:
+            now = self.clock()
+            self.entries = {k: v for k, v in self.entries.items() if v[1] > now}
+            attempts, expiry, _ = self.entries.get(key, (0, now, None))
+            if attempts >= PIN_ATTEMPTS or (key not in self.entries and len(self.entries) >= 4096):
+                raise Rejected('Member request declined')
+            attempts += 1
+            if attempts in (1, PIN_ATTEMPTS):
+                expiry = now + PIN_COOLDOWN
+            reservation = uuid4()
+            self.entries[key] = (attempts, expiry, reservation)
+            return reservation
+
+    async def clear(self, pan, reservation):
+        key = card_key(self.key, pan)
+        async with self.lock:
+            if self.entries.get(key, (None, None, None))[2] == reservation:
+                self.entries.pop(key, None)
+
+
+class PostgresPinGate:
+    """Persist reservations before verification, including across call cancellation and restarts."""
+    def __init__(self, store, key):
+        self.store, self.key = store, key
+
+    async def reserve(self, pan):
+        key, reservation = card_key(self.key, pan), uuid4()
+        try:
+            async with self.store.pool.connection() as connection:
+                result = await connection.execute(
+                    "INSERT INTO shadybank_pin_attempts(card_key, attempts, expires_at, reservation) "
+                    "VALUES (%s, 1, clock_timestamp() + interval '10 minutes', %s) "
+                    "ON CONFLICT (card_key) DO UPDATE SET "
+                    "attempts=CASE WHEN shadybank_pin_attempts.expires_at<=clock_timestamp() THEN 1 "
+                    "ELSE shadybank_pin_attempts.attempts+1 END, "
+                    "expires_at=CASE WHEN shadybank_pin_attempts.expires_at<=clock_timestamp() "
+                    "OR shadybank_pin_attempts.attempts=2 THEN clock_timestamp()+interval '10 minutes' "
+                    "ELSE shadybank_pin_attempts.expires_at END, reservation=EXCLUDED.reservation "
+                    "WHERE shadybank_pin_attempts.expires_at<=clock_timestamp() OR shadybank_pin_attempts.attempts<3 "
+                    "RETURNING reservation", (key, reservation))
+                accepted = await result.fetchone()
+                # Bounded cleanup does not wait on other cards' uncommitted reservations.
+                await connection.execute("DELETE FROM shadybank_pin_attempts WHERE card_key IN ("
+                    "SELECT card_key FROM shadybank_pin_attempts WHERE expires_at<=clock_timestamp() "
+                    "ORDER BY expires_at LIMIT 100 FOR UPDATE SKIP LOCKED)")
+        except (psycopg.Error, PoolTimeout, OSError):
+            raise Unavailable('Member service unavailable') from None
+        if accepted is None:
+            raise Rejected('Member request declined')
+        return reservation
+
+    async def clear(self, pan, reservation):
+        try:
+            # A successful older request must not clear a concurrently reserved, newer attempt.
+            async with self.store.pool.connection() as connection:
+                await connection.execute('DELETE FROM shadybank_pin_attempts WHERE card_key=%s AND reservation=%s',
+                                         (card_key(self.key, pan), reservation))
+        except (psycopg.Error, PoolTimeout, OSError):
+            raise Unavailable('Member service unavailable') from None
+
+
+class PinProtectedBank:
+    def __init__(self, gate=None):
+        self.pin_gate = gate if gate is not None else MemoryPinGate()
+
+    async def login(self, pan, pin):
+        if not isinstance(pan, str) or not isinstance(pin, str) or not PAN.fullmatch(pan) or not PIN.fullmatch(pin):
+            raise Rejected('Member request declined')
+        # Commit the attempt before calling the backend. Hangup or a lost response cannot erase it.
+        reservation = await self.pin_gate.reserve(pan)
+        session = await self._authenticate(pan, pin)
+        try:
+            await self.pin_gate.clear(pan, reservation)
+        except Unavailable:
+            with suppress(Rejected, Unavailable, TimeoutError):
+                await asyncio.wait_for(self.logout(session), 3)
+            raise
+        return session
 
 
 def money(value):
@@ -62,8 +162,9 @@ class Session:
         return asyncio.get_running_loop().time() < self.expires
 
 
-class LiveBank:
-    def __init__(self, client, url, service_key):
+class LiveBank(PinProtectedBank):
+    def __init__(self, client, url, service_key, gate=None):
+        super().__init__(gate)
         self.client=client
         self.key=service_key
         try:
@@ -100,9 +201,7 @@ class LiveBank:
                 raise UnknownTransfer('Transfer status unknown') from None
             raise Unavailable('Member service unavailable') from None
 
-    async def login(self, pan, pin):
-        if not PAN.fullmatch(pan) or not PIN.fullmatch(pin):
-            raise Rejected('Member request declined')
+    async def _authenticate(self, pan, pin):
         data=await self._request('POST','login',form={'pan':pan,'pin':pin})
         try:
             token,ttl=data['token'],data['expires_in']
@@ -164,17 +263,18 @@ class FixtureAccount:
     activity: list = field(default_factory=list)
 
 
-class DemoBank:
+class DemoBank(PinProtectedBank):
     """Synthetic per-process ledger, never linked to a real member account."""
-    def __init__(self):
+    def __init__(self, gate=None):
+        super().__init__(gate)
         self.accounts={DEMO_CARD:FixtureAccount(Decimal('123.45')),
                        DEMO_RECIPIENT:FixtureAccount(Decimal('42.00'))}
         self.sessions={}
         self.receipts={}
         self.lock=asyncio.Lock()
 
-    async def login(self,pan,pin):
-        if pan not in self.accounts or not hmac.compare_digest(pin,DEMO_PIN):
+    async def _authenticate(self,pan,pin):
+        if not hmac.compare_digest(pin,DEMO_PIN) or pan not in self.accounts:
             raise Rejected('Member request declined')
         token=uuid4().hex
         session=Session(token,asyncio.get_running_loop().time()+300,pan[-4:])
@@ -220,12 +320,21 @@ class DemoBank:
             return reference
 
 
-def configured(client):
+def configured(client, store=None):
     mode=os.getenv('ADSI_SHADYBANK_MODE','disabled')
+    gate = None
+    if mode in ('demo', 'live') and store is not None:
+        try:
+            key = bytes.fromhex(os.getenv('ADSI_DATA_KEY', ''))
+        except ValueError:
+            return None, False
+        if len(key) != 32:
+            return None, False
+        gate = PostgresPinGate(store, key)
     if mode=='demo':
-        return DemoBank(), True
-    if mode=='live':
-        bank=LiveBank(client,os.getenv('ADSI_SHADYBANK_URL',''),os.getenv('ADSI_SHADYBANK_SERVICE_KEY',''))
+        return DemoBank(gate), True
+    if mode=='live' and gate is not None:
+        bank=LiveBank(client,os.getenv('ADSI_SHADYBANK_URL',''),os.getenv('ADSI_SHADYBANK_SERVICE_KEY',''),gate)
         return (bank,False) if bank.base else (None,False)
     return None,False
 

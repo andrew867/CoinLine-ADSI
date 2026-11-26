@@ -128,15 +128,22 @@ class Gateway:
     async def serve(self) -> None:
         address = self.base.replace("http", "ws", 1) + f"/ari/events?app={APP}"
         try:
-            self.lab_audio = {prompt: await audio.speech(prompt) for prompt in LAB_PROMPTS}
             while True:
+                if not self.lab_audio:
+                    try:
+                        self.lab_audio = {prompt: await audio.speech(prompt) for prompt in LAB_PROMPTS}
+                    except (OSError, RuntimeError, TimeoutError) as error:
+                        # A transient speech startup failure must not leave the gateway task dead.
+                        LOG.warning("Gateway prompt preparation failed (%s)", type(error).__name__)
+                        await asyncio.sleep(1)
+                        continue
                 try:
                     async with connect(address, additional_headers={"Authorization": self.authorization}, proxy=None) as ws:
                         self.connected = True
                         async for raw in ws:
                             await self._event(json.loads(raw))
                 except (OSError, WebSocketException, httpx.HTTPError, TimeoutError) as error:
-                    LOG.info("ARI unavailable (%s)", type(error).__name__)
+                    LOG.warning("ARI unavailable (%s)", type(error).__name__)
                 finally:
                     self.connected = False
                     tasks = [call.task for call in self.calls.values() if call.task]

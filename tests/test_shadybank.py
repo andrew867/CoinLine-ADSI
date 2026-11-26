@@ -1,7 +1,8 @@
 import asyncio
+import os
 import unittest
 from decimal import Decimal
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from urllib.parse import parse_qs
 from uuid import uuid4
 
@@ -72,8 +73,8 @@ class ShadybankTests(unittest.IsolatedAsyncioTestCase):
         return link
 
     @staticmethod
-    def entry():
-        return [*shadybank.DEMO_CARD,'#',*shadybank.DEMO_PIN,'#']
+    def entry(card=shadybank.DEMO_CARD, pin=shadybank.DEMO_PIN):
+        return [*card,'#',*pin,'#']
 
     @staticmethod
     def transfer():
@@ -110,6 +111,70 @@ class ShadybankTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(bank.receipts)
         self.assertFalse(bank.sessions)
         self.assertEqual(bank.accounts[shadybank.DEMO_CARD].balance,Decimal('123.45'))
+
+    async def test_pin_cooldown_is_card_scoped_and_prompts_do_not_reveal_enrollment(self):
+        now = [100.0]
+        bank = shadybank.DemoBank(shadybank.MemoryPinGate(lambda: now[0]))
+        async def failed(card, pin):
+            link = self.link([*self.entry(card, pin), '0'])
+            await shadybank.call(bank, True, link, AsyncMock())
+            self.assertFalse(bank.sessions)
+            frames = b''.join(event.args[0] for event in link.transfer.await_args_list)
+            self.assertIn(b'LOGIN FAILED', frames)
+            return frames
+
+        for _ in range(3):
+            enrolled = await failed(shadybank.DEMO_CARD, '000000')
+            unknown = await failed('9000000000000099', '000000')
+            self.assertEqual(enrolled, unknown)
+        self.assertEqual(await failed(shadybank.DEMO_CARD, shadybank.DEMO_PIN), enrolled)
+        now[0] += shadybank.PIN_COOLDOWN - 1
+        await failed(shadybank.DEMO_CARD, shadybank.DEMO_PIN)
+        # Another card is unaffected, and blocked requests do not extend the cooldown.
+        session = await bank.login(shadybank.DEMO_RECIPIENT, shadybank.DEMO_PIN)
+        await bank.logout(session)
+        now[0] += 1
+        session = await bank.login(shadybank.DEMO_CARD, shadybank.DEMO_PIN)
+        await bank.logout(session)
+        self.assertNotIn(shadybank.card_key(bank.pin_gate.key, shadybank.DEMO_CARD), bank.pin_gate.entries)
+
+    async def test_concurrent_and_cancelled_pin_attempts_are_reserved_before_verification(self):
+        calls = []
+        arrived = asyncio.Event()
+        async def reject(request):
+            calls.append(request.url.path)
+            arrived.set()
+            await asyncio.sleep(.03)
+            return httpx.Response(401)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(reject)) as client:
+            bank = shadybank.LiveBank(client, 'https://example.test', 'x' * 32)
+            abandoned = asyncio.create_task(bank.login(shadybank.DEMO_CARD, '000000'))
+            await arrived.wait()
+            abandoned.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await abandoned
+            outcomes = await asyncio.gather(*(bank.login(shadybank.DEMO_CARD, '000000') for _ in range(6)),
+                                             return_exceptions=True)
+            self.assertTrue(all(isinstance(outcome, shadybank.Rejected) for outcome in outcomes))
+            self.assertEqual(len(calls), 3)
+            with self.assertRaises(shadybank.Rejected):
+                await bank.login(shadybank.DEMO_CARD, shadybank.DEMO_PIN)
+            self.assertEqual(len(calls), 3)
+
+    def test_live_configuration_requires_persistent_store_and_stable_key(self):
+        settings = {'ADSI_SHADYBANK_MODE': 'live', 'ADSI_SHADYBANK_URL': 'https://example.test',
+                    'ADSI_SHADYBANK_SERVICE_KEY': 'x' * 32, 'ADSI_DATA_KEY': '00' * 32}
+        with patch.dict(os.environ, settings, clear=True):
+            self.assertEqual(shadybank.configured(None), (None, False))
+            bank, demo = shadybank.configured(None, object())
+            self.assertIsInstance(bank.pin_gate, shadybank.PostgresPinGate)
+            self.assertFalse(demo)
+            with patch.dict(os.environ, {'ADSI_SHADYBANK_MODE': 'demo'}):
+                bank, demo = shadybank.configured(None, object())
+                self.assertTrue(demo)
+                self.assertIsInstance(bank.pin_gate, shadybank.PostgresPinGate)
+            with patch.dict(os.environ, {'ADSI_DATA_KEY': ''}):
+                self.assertEqual(shadybank.configured(None, object()), (None, False))
 
     async def test_profile_scoping(self):
         gateway=Gateway('http://example.test','fixture',AsyncMock())

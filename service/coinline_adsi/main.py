@@ -1,6 +1,7 @@
 """Application entry point."""
 
 import asyncio
+import logging
 import os
 from collections import deque
 from contextlib import asynccontextmanager
@@ -21,6 +22,15 @@ from .regional import CAPITALS, choose, choose_weather
 from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, SCREENPHONE_REVISION, TRAVEL_REVISION, Store, StoreError
 
 
+LOG = logging.getLogger(__name__)
+
+
+def report_gateway_stop(task):
+    if not task.cancelled():
+        error = task.exception()
+        LOG.error("Gateway task stopped (%s)", type(error).__name__ if error is not None else "unexpected return")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.sessions = {}
@@ -28,7 +38,7 @@ async def lifespan(app: FastAPI):
     app.state.failures = deque()
     app.state.db = Store() if os.getenv("ADSI_DB_HOST") else None
     app.state.providers = Providers()
-    app.state.shadybank, app.state.shadybank_demo = shadybank.configured(app.state.providers.client)
+    app.state.shadybank, app.state.shadybank_demo = shadybank.configured(app.state.providers.client, app.state.db)
     private_key = app.state.oidc[2] if app.state.oidc else (
         bytes.fromhex(os.environ["ADSI_DATA_KEY"]) if os.getenv("ADSI_LOCAL_BANK_ENROLLMENT") == "1" else None)
     app.state.private = PrivateBalances(app.state.db, app.state.providers.client, private_key) if (
@@ -220,6 +230,7 @@ async def lifespan(app: FastAPI):
                                         emu_interaction_profile=emu_profile,
                                         shadybank_profile=os.getenv("ADSI_SHADYBANK_INTERACTION_PROFILE", VOICE_BETWEEN_SCREENS))
             task = asyncio.create_task(app.state.gateway.serve())
+            task.add_done_callback(report_gateway_stop)
         yield
     finally:
         if task:

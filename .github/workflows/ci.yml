@@ -10,6 +10,30 @@ permissions:
   contents: read
 
 jobs:
+  shadybank-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          repository: andrew867/shadybank
+          ref: trunk
+          path: contract-bank
+      - name: Verify actual member client and API contract
+        env:
+          ADSI_CONTRACT_CLIENT_ROOT: ${{ github.workspace }}
+        run: |
+          # Until the initial member API PR merges, only the exact pre-API trunk
+          # baseline may use its reviewed immutable candidate. Later trunk changes
+          # must contain a working member contract; never silently fall back.
+          if [ "$(git -C contract-bank rev-parse HEAD)" = 5079bcd819f38bb61b687bac55bcc4eedc3883b5 ]; then
+            git -C contract-bank fetch --depth=1 origin 3ba3f4c5c6a80a2dfafedcb844046fd80ad330b6
+            git -C contract-bank checkout --detach FETCH_HEAD
+          fi
+          test -f contract-bank/tests/test_adsi_contract.py
+          python -m pip install -r service/requirements.txt aiohttp==3.11.13 asyncpg==0.30.0 passlib==1.7.4 argon2-cffi==23.1.0
+          python -m unittest discover -s contract-bank/tests -p test_adsi_contract.py -v
   verification:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -39,6 +63,7 @@ jobs:
           python tests/live_sip_app.py
           python tests/live_balance_demo.py
           ADSI_SHADYBANK_MODE=demo docker compose up -d --no-deps --wait app
+          docker compose exec -T app python - < tests/check_shadybank_lockout.py
           PYTHONPATH=service python tests/live_shadybank.py
           PYTHONPATH=service python tests/live_extra_services.py
           ADSI_FDM_ENABLE=1 docker compose up -d --no-deps --wait app
@@ -64,7 +89,10 @@ jobs:
           python tests/live_capacity.py
       - name: Show service state after failure
         if: failure()
-        run: docker compose --profile verify ps -a
+        run: |
+          docker compose --profile verify ps -a
+          docker compose logs --tail=80 app migrate gateway
+          docker compose exec -T gateway asterisk -rx 'ari show apps' || true
   native-mail:
     runs-on: ubuntu-latest
     timeout-minutes: 45

@@ -1,7 +1,8 @@
 import configparser
+import asyncio
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 from coinline_adsi.asterisk import Gateway
 from coinline_adsi.link import CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS
@@ -12,6 +13,34 @@ CONFIG = ROOT / 'deploy/asterisk/config'
 
 
 class EmulatorIngressTests(unittest.IsolatedAsyncioTestCase):
+    async def test_gateway_retries_transient_prompt_preparation_failure(self):
+        gateway = Gateway('http://example.test', 'synthetic', AsyncMock())
+        entered = asyncio.Event()
+
+        class FixtureConnection:
+            async def __aenter__(self):
+                entered.set()
+                return self
+            async def __aexit__(self, *args):
+                return False
+            def __aiter__(self):
+                return self
+            async def __anext__(self):
+                await asyncio.Future()
+
+        from coinline_adsi.link import LAB_PROMPTS
+        with patch('coinline_adsi.asterisk.audio.speech', new=AsyncMock(
+                side_effect=[RuntimeError('synthetic transient failure'), *([b'pcm'] * len(LAB_PROMPTS))])), \
+                patch('coinline_adsi.asterisk.connect', return_value=FixtureConnection()):
+            task = asyncio.create_task(gateway.serve())
+            try:
+                await asyncio.wait_for(entered.wait(), 5)
+                self.assertTrue(gateway.connected)
+                self.assertEqual(set(gateway.lab_audio), set(LAB_PROMPTS))
+            finally:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
     async def test_voice_profile_is_opt_in_and_route_scoped(self):
         gateway = Gateway('http://example.test', 'synthetic', AsyncMock(),
                           emu_interaction_profile=VOICE_BETWEEN_SCREENS)

@@ -169,6 +169,10 @@ class ShadybankTests(unittest.IsolatedAsyncioTestCase):
             bank, demo = shadybank.configured(None, object())
             self.assertIsInstance(bank.pin_gate, shadybank.PostgresPinGate)
             self.assertFalse(demo)
+            with patch.dict(os.environ, {'ADSI_SHADYBANK_MODE': 'demo'}):
+                bank, demo = shadybank.configured(None, object())
+                self.assertTrue(demo)
+                self.assertIsInstance(bank.pin_gate, shadybank.PostgresPinGate)
             with patch.dict(os.environ, {'ADSI_DATA_KEY': ''}):
                 self.assertEqual(shadybank.configured(None, object()), (None, False))
 

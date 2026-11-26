@@ -89,7 +89,9 @@ jobs:
           python tests/live_capacity.py
       - name: Show service state after failure
         if: failure()
-        run: docker compose --profile verify ps -a
+        run: |
+          docker compose --profile verify ps -a
+          docker compose logs --tail=80 app migrate
   native-mail:
     runs-on: ubuntu-latest
     timeout-minutes: 45

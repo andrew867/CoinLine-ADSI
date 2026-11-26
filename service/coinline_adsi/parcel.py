@@ -21,15 +21,22 @@ def confirmation(digits):
     return ['CONFIRM TRACKING', f'{len(digits)} digits entered', f'Ending in {digits[-4:]}', 'Look up this parcel?']
 
 
-async def collect(link, say):
+async def collect(link, say, *, demo=False):
     """Collect in one voice interval, so rapid keypad entry is not lost during FSK."""
     digits = ''
-    for _ in range(3):
+    for attempt in range(3):
+        lines = ENTRY_LINES.copy()
+        if demo:
+            lines[1] = 'Demo: sample number'
+        if attempt and not digits:
+            lines[2] = 'Use 12 to 22 digits'
+            lines[3] = 'Submit when ready'
         if link.display_active:
-            await link.transfer(wire.screen(ENTRY_LINES, ENTRY_KEYS, slots=[4,5]), open_input=True)
+            await link.transfer(wire.screen(lines, ENTRY_KEYS, slots=[4,5]), open_input=True)
         else:
             link.open_voice_input()
-            await say('Enter your FedEx tracking number. Press pound to submit, star to erase or cancel when empty.')
+            await say(('Demo only. Enter a sample number. ' if demo else 'Enter your FedEx tracking number. ') +
+                      'Use 12 to 22 digits. Press pound to submit, star to erase or cancel when empty.')
         deadline = asyncio.get_running_loop().time()+60
         try:
             for __ in range(64):
@@ -96,6 +103,10 @@ class Parcel:
         self.lock=asyncio.Lock()
         self.requests=0
         self.window=0
+
+    @staticmethod
+    def configured():
+        return bool(os.getenv('ADSI_FEDEX_CLIENT_ID') and os.getenv('ADSI_FEDEX_CLIENT_SECRET'))
 
     async def _auth(self, root, client_id, client_secret):
         async with self.lock:

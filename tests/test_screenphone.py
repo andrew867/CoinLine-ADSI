@@ -112,6 +112,14 @@ class ScreenphoneTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await adapter.close()
 
+    async def test_operator_cinema_setting_overrides_environment_default(self):
+        with patch.dict('os.environ',{'ADSI_CINEPLEX_API_KEY':''}):
+            self.assertFalse(providers.Providers.cinema_enabled({}))
+            self.assertTrue(providers.Providers.cinema_enabled({'cinema':True}))
+        with patch.dict('os.environ',{'ADSI_CINEPLEX_API_KEY':'synthetic'}):
+            self.assertTrue(providers.Providers.cinema_enabled({}))
+            self.assertFalse(providers.Providers.cinema_enabled({'cinema':False}))
+
     async def test_fedex_mock_auth_and_no_fallback(self):
         tracking='000000000002'
         result={'output':{'completeTrackResults':[{'trackingNumber':tracking,'trackResults':[

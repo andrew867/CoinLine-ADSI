@@ -139,6 +139,11 @@ class Providers:
     def regional_enabled(self, config):
         return self.regional is not None and config.get("regional", True)
 
+    @staticmethod
+    def cinema_enabled(config):
+        # Explicit operator setting takes precedence; supplying a key provisions the service by default.
+        return config.get("cinema", bool(os.getenv("ADSI_CINEPLEX_API_KEY")))
+
     async def _weather(self, site):
         now = datetime.now(UTC)
         key = (site["province"], site["code"])
@@ -177,9 +182,10 @@ class Providers:
         if operation == "directory.lookup":
             return directory.lookup(config, key)
         if operation == "cinema.showtimes":
-            if config.get("cinema") and not self.regional_enabled(config):
+            enabled = self.cinema_enabled(config)
+            if enabled and not self.regional_enabled(config):
                 return None
-            return await self.cinema.lookup(key, config.get("cinema", False))
+            return await self.cinema.lookup(key, enabled)
         if operation == "parcel.track":
             return await self.parcel.lookup(key, config.get("parcel", False))
         if operation.startswith("weather.") and key in config.get("sites", {}):

@@ -105,7 +105,10 @@ async def lifespan(app: FastAPI):
                     return {"number": number} if number else None
                 return arguments
             if operation == "parcel.track" and arguments.get("number") == "selected":
-                number = await parcel.collect(link, say)
+                live_parcel = config.get("parcel", False)
+                if live_parcel and not providers.parcel.configured():
+                    return None
+                number = await parcel.collect(link, say, demo=not live_parcel)
                 return {"number": number} if number else None
             if regional and not resolved:
                 resolved = True
@@ -115,9 +118,10 @@ async def lifespan(app: FastAPI):
                 except TimeoutError:
                     pass
             if operation == "cinema.showtimes" and arguments.get("selection") == "selected":
-                if config.get("cinema") and not regional:
+                enabled = providers.cinema_enabled(config)
+                if enabled and not regional:
                     return None
-                selection = await providers.cinema.prepare(link, say, inferred, config.get("cinema", False))
+                selection = await providers.cinema.prepare(link, say, inferred, enabled)
                 return {"selection": selection} if selection else None
             if operation.startswith("weather.") and arguments.get("site") == "selected":
                 if location is None:

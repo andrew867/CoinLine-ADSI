@@ -101,7 +101,8 @@ class Simulation:
 
     async def result(self):
         if self.parcel_entry():
-            lines = parcel.confirmation(self.parcel_digits) if self.parcel_confirm else parcel.ENTRY_LINES
+            lines = parcel.confirmation(self.parcel_digits) if self.parcel_confirm else [
+                parcel.ENTRY_LINES[0], "Demo: sample number", *parcel.ENTRY_LINES[2:]]
             keys = parcel.CONFIRM_KEYS if self.parcel_confirm else parcel.ENTRY_KEYS
             slots = [1,2,6] if self.parcel_confirm else [4,5]
             return {"node": self.instance.node, "lines": lines, "choices": [

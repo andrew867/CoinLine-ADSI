@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
 
-type Choice = { digit: string; label: string; target: string };
+type Choice = { digit: string; label: string; target: string; slot?: number };
 type Node = {
   id: string;
   type: "menu" | "message" | "provider" | "end";
   lines?: string[];
+  layout?: "information";
   prompt?: string;
   action?: "balance-demo" | "private-balance";
   choices?: Choice[];
@@ -35,6 +36,7 @@ const operations: Record<string, string> = {
   "weather.current": "site", "weather.forecast": "site", "news.headlines": "topic",
   "market.quote": "instrument", "lottery.draw": "game", "assistant.answer": "question",
   "airport.arrivals": "airport", "airport.departures": "airport", "directory.lookup": "number",
+  "cinema.showtimes": "selection", "parcel.track": "number",
 };
 const titles = { menu: "Menu", message: "Screen", provider: "Data", end: "End call" };
 
@@ -75,6 +77,7 @@ function App() {
   const [coordinates, setCoordinates] = useState<Record<string, Point>>({});
   const [revision, setRevision] = useState<Revision[]>([]);
   const [stage, setStage] = useState<Simulation>();
+  const [terminalLayout, setTerminalLayout] = useState<"graphical" | "screenphone">("graphical");
   const [fault, setFault] = useState("");
   const [settings, setSettings] = useState<Settings>();
   const [configuration, setConfiguration] = useState("");
@@ -293,6 +296,10 @@ function App() {
             onClick={() => setDraft({ ...draft, entry: chosen.id })}>Set start</button></div>
           {chosen.lines && <label>Display lines<textarea rows={4} value={chosen.lines.join("\n")}
             onChange={(event) => edit({ lines: event.target.value.split("\n") })} /></label>}
+          {chosen.lines && <label>Screen layout<select value={chosen.layout ?? ""}
+            onChange={(event) => edit({ layout: event.target.value === "information" ? "information" : undefined })}>
+            <option value="">Legacy pages</option><option value="information">Information with stable softkeys</option>
+          </select></label>}
           {chosen.type !== "provider" && <label>Voice prompt<textarea rows={2} value={chosen.prompt ?? ""}
             onChange={(event) => edit({ prompt: event.target.value })} /></label>}
           {chosen.type === "end" && <label>Action<select value={chosen.action ?? ""}
@@ -350,16 +357,21 @@ function App() {
       </section>}
       <aside className="preview">
         <h2>Handset simulator</h2>
-        <div className="phone">
+        <label>Terminal layout<select value={terminalLayout} onChange={(event) => setTerminalLayout(event.target.value as typeof terminalLayout)}>
+          <option value="graphical">Graphical side keys</option><option value="screenphone">Screenphone bottom keys</option>
+        </select></label>
+        <div className={`phone ${terminalLayout}`}>
+          <div className="screen-panel">
           <div className="display" aria-label="Terminal display" aria-live="polite">
             {(stage?.lines ?? chosen?.lines?.slice(0, 4) ?? ["READY"]).map((line, index) => <div key={index}>{line}</div>)}
             {stage?.ended && <div>CALL ENDED</div>}
           </div>
           <div className="keys">{Array.from({ length: 6 }, (_, index) => {
-            const choice = stage?.choices[index];
+            const choice = stage?.choices.find((item, position) => (item.slot ?? position + 1) === index + 1);
             return <button key={index} disabled={!choice || busy} aria-label={choice?.label ?? "Unassigned softkey"}
               onClick={() => { if (choice) void action(() => simEvent({ digit: choice.digit })); }}>{choice?.label ?? "·"}</button>;
           })}</div>
+          </div>
           <div className="keypad">{Array.from("123456789*0#").map((digit) => <button key={digit}
             disabled={!stage || stage.ended || busy} onClick={() => void action(() => simEvent({ digit }))}>{digit}</button>)}</div>
         </div>

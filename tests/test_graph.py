@@ -53,6 +53,27 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ConsoleTests(unittest.TestCase):
+    def test_screenphone_parcel_simulation(self):
+        document = json.loads((ROOT / "service/coinline_adsi/infoline-screenphone.json").read_text(encoding="utf-8"))
+        with patch.dict("os.environ", {"ADSI_ADMIN_PASSWORD": "synthetic-console"}), TestClient(app) as client:
+            client.post("/api/v1/session", headers=HEADERS, json={"password": "synthetic-console"}).raise_for_status()
+            response = client.post("/api/v1/simulations", headers=HEADERS, json={"graph": document})
+            response.raise_for_status()
+            path=f"/api/v1/simulations/{response.json()['id']}/events"
+            def press(digit):
+                result=client.post(path,headers=HEADERS,json={"digit":digit})
+                result.raise_for_status()
+                return result.json()
+            press('5')
+            self.assertEqual(press('5')['lines'][0], 'TRACK A PARCEL')
+            for digit in '000000000002':
+                press(digit)
+            self.assertIn('Ending in 0002',press('#')['lines'])
+            self.assertEqual(press('1')['lines'][0], 'DEMO FEDEX')
+            self.assertEqual(press('0')['node'],'services')
+            self.assertEqual(press('5')['lines'][0], 'TRACK A PARCEL')
+            self.assertEqual(press('*')['node'],'parcel-unavailable')
+
     def test_session_and_fixture_simulator(self):
         with patch.dict("os.environ", {"ADSI_ADMIN_PASSWORD": "synthetic-console"}), TestClient(app) as client:
             self.assertEqual(client.get("/api/v1/session").status_code, 401)

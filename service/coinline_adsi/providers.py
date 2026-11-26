@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from defusedxml import ElementTree
 
-from . import directory, flights, graph, livefeeds, wire
+from . import cinema, directory, flights, graph, livefeeds, parcel, wire
 from .assistant import InformationDesk
 from .link import Link
 from .regional import Regional
@@ -38,6 +38,10 @@ def fixture(operation, args, fault=None):
         return flights.fixture(operation, args.get("airport", "YYT"))
     if operation == "directory.lookup":
         return directory.lookup({}, args.get("number", "selected"))
+    if operation == "cinema.showtimes":
+        return cinema.fixture()
+    if operation == "parcel.track":
+        return parcel.fixture()
     if operation == "weather.current":
         case = 1 if fault == "stale" else 0
         with (FIXTURE_ROOT / "providers/weather.json").open(encoding="utf-8") as source:
@@ -60,10 +64,12 @@ def fixture(operation, args, fault=None):
 
 
 def check_config(config: dict) -> None:
-    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional", "flights", "directory"}:
+    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional", "flights", "directory", "cinema", "parcel"}:
         raise ValueError("Unknown provider configuration field.")
     if type(config.get("flights", False)) is not bool:
         raise ValueError("Flights configuration is a boolean.")
+    if any(type(config.get(key, False)) is not bool for key in ("cinema", "parcel")):
+        raise ValueError("Cinema and parcel configuration must be boolean.")
     if "directory" in config:
         directory.validate(config["directory"])
     if type(config.get("regional", True)) is not bool:
@@ -127,6 +133,8 @@ class Providers:
         self.weather_cache = {}
         self.weather_refresh = asyncio.Lock()
         self.regional = Regional() if os.getenv("ADSI_REGIONAL_ENABLE") == "1" else None
+        self.cinema = cinema.Cinema(self.regional)
+        self.parcel = parcel.Parcel(self.client)
 
     def regional_enabled(self, config):
         return self.regional is not None and config.get("regional", True)
@@ -168,6 +176,12 @@ class Providers:
             return await self.flights.lookup(operation, key, config.get("flights", False))
         if operation == "directory.lookup":
             return directory.lookup(config, key)
+        if operation == "cinema.showtimes":
+            if config.get("cinema") and not self.regional_enabled(config):
+                return None
+            return await self.cinema.lookup(key, config.get("cinema", False))
+        if operation == "parcel.track":
+            return await self.parcel.lookup(key, config.get("parcel", False))
         if operation.startswith("weather.") and key in config.get("sites", {}):
             return await self._weather_result(operation, config["sites"][key])
         if operation == "assistant.answer":

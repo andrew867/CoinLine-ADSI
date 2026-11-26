@@ -16,7 +16,7 @@ def main():
             call.press(digit)
         for digit in code:
             call.press(digit)
-        call.display("DEMO BALANCE", lines=["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "0 Exit"])
+        call.display("DEMO BALANCE", lines=["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "Example account"])
         call.press("0")
         call.display("GOODBYE", lines=["GOODBYE", "", "", ""])
         assert call.process.wait(timeout=10) == 0
@@ -36,7 +36,7 @@ def main():
         time.sleep(0.8)
         for digit in code:
             call.press(digit)
-        call.display("DEMO BALANCE", lines=["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "1 Trans  0 Exit"])
+        call.display("DEMO BALANCE", lines=["DEMO BALANCE", "CAD 1234.56", "As of 07 Feb 2026", "Example account"])
         time.sleep(0.8)
         call.press("1")
         call.display("ACTIVITY 1/2")

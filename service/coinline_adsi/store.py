@@ -16,6 +16,7 @@ DEMO_ID = UUID("320b5017-1d86-4be4-98ca-df9aaff08031")
 LEGACY_DEMO_REVISION = UUID("9ff5ef31-0439-4723-9aea-cf778f4ec36d")
 DEMO_REVISION = UUID("558c2930-05ea-44e9-997c-2b17880edfea")
 SERVICES_REVISION = UUID("d24a5017-450a-4c92-b477-87b1403ce424")
+SCREENPHONE_REVISION = UUID("f70ddf97-4a0d-4a05-a1f6-f67753dca52e")
 HERE = Path(__file__).resolve().parent
 
 
@@ -41,15 +42,15 @@ async def migrate():
             await connection.execute("SELECT pg_advisory_xact_lock(728143082)")
             for migration in sorted((HERE / "migrations").glob("*.sql")):
                 await connection.execute(migration.read_text(encoding="utf-8"))
-            graph = Jsonb(json.loads((HERE / "infoline-services.json").read_text(encoding="utf-8")))
+            graph = Jsonb(json.loads((HERE / "infoline-screenphone.json").read_text(encoding="utf-8")))
             seeded = await connection.execute(
                 "INSERT INTO applications(id, name, draft) VALUES (%s, %s, %s) "
                 "ON CONFLICT DO NOTHING RETURNING id", (DEMO_ID, "CoinLine InfoLine", graph))
             if await seeded.fetchone():
                 await connection.execute(
                     "INSERT INTO revisions(id, app_id, generation, graph) VALUES (%s, %s, 1, %s)",
-                    (SERVICES_REVISION, DEMO_ID, graph))
-                await connection.execute("UPDATE routes SET revision_id=%s WHERE name='infoline'", (SERVICES_REVISION,))
+                    (SCREENPHONE_REVISION, DEMO_ID, graph))
+                await connection.execute("UPDATE routes SET revision_id=%s WHERE name='infoline'", (SCREENPHONE_REVISION,))
             else:
                 # Upgrade only the original, unedited sample and keep its published revision.
                 changed = await connection.execute(
@@ -57,14 +58,14 @@ async def migrate():
                     "FROM revisions AS r JOIN routes ON routes.revision_id=r.id "
                     "WHERE a.id=%s AND NOT a.archived AND r.app_id=a.id "
                     "AND a.generation=r.generation AND a.draft=r.graph "
-                    "AND routes.name='infoline' AND r.id IN (%s,%s) "
+                    "AND routes.name='infoline' AND r.id IN (%s,%s,%s) "
                     "AND NOT EXISTS(SELECT 1 FROM revisions WHERE id=%s) "
-                    "RETURNING a.generation", (graph, DEMO_ID, LEGACY_DEMO_REVISION, DEMO_REVISION, SERVICES_REVISION))
+                    "RETURNING a.generation", (graph, DEMO_ID, LEGACY_DEMO_REVISION, DEMO_REVISION, SERVICES_REVISION, SCREENPHONE_REVISION))
                 row = await changed.fetchone()
                 if row:
                     await connection.execute("INSERT INTO revisions(id,app_id,generation,graph) VALUES (%s,%s,%s,%s)",
-                                             (SERVICES_REVISION, DEMO_ID, row[0], graph))
-                    await connection.execute("UPDATE routes SET revision_id=%s WHERE name='infoline'", (SERVICES_REVISION,))
+                                             (SCREENPHONE_REVISION, DEMO_ID, row[0], graph))
+                    await connection.execute("UPDATE routes SET revision_id=%s WHERE name='infoline'", (SCREENPHONE_REVISION,))
 
 
 class Store:

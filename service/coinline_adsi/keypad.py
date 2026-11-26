@@ -23,9 +23,9 @@ def heading(title, query, count):
     return label if len(label) <= 20 else f'{query or "?"} [{count}] {title}'[:20]
 
 
-async def _screen(link, say, lines, choices, prompt):
+async def _screen(link, say, lines, choices, prompt, slots=None):
     if link.display_active:
-        await link.transfer(wire.screen([graph.handset_text(line)[:20] for line in lines], choices), open_input=True)
+        await link.transfer(wire.screen([graph.handset_text(line)[:20] for line in lines], choices, slots=slots), open_input=True)
     else:
         link.open_voice_input()
         await say(prompt)
@@ -40,14 +40,18 @@ async def select(link, say, title, entries, *, maximum=4):
             found = matches(entries, query)
             if listing:
                 batch = found[offset:offset + 2]
-                choices = [(f'{i} Select', str(i)) for i in range(1, len(batch) + 1)]
+                choices = [(f'Select{i}', str(i)) for i in range(1, len(batch) + 1)]
+                slots = list(range(1,len(batch)+1))
                 choices += [('Next', '3')] if offset + 2 < len(found) else []
+                slots += [5] if offset + 2 < len(found) else []
                 choices += [('Prev', '4')] if offset else []
+                slots += [4] if offset else []
                 choices += [('Search', '0')]
+                slots += [6]
                 digit = await _screen(link, say, [f'{title} {offset + 1}-{offset + len(batch)}',
-                    *(f'{i} {item[1]}' for i, item in enumerate(batch, 1)), '0 Search'], choices,
+                    *(f'{i} {item[1]}' for i, item in enumerate(batch, 1)), f'Page {offset//2+1}/{(len(found)+1)//2}'], choices,
                     '. '.join([title, *(f'Press {i} for {item[1]}' for i, item in enumerate(batch, 1)),
-                               'Press 3 for next, 4 for previous or 0 to search']))
+                               'Press 3 for next, 4 for previous or 0 to search']), slots)
                 if digit in ('1', '2') and int(digit) <= len(batch):
                     return batch[int(digit) - 1][0]
                 if digit == '3' and offset + 2 < len(found):
@@ -58,10 +62,10 @@ async def select(link, say, title, entries, *, maximum=4):
                     listing = False
                 continue
             preview = [entry[1] for entry in found[:2]] or ['No matches']
-            lines = [heading(title, query, len(found)), *(preview + [' '] * (2 - len(preview))), '1 List * Del 0 Exit']
-            digit = await _screen(link, say, lines, [('List', '1'), ('Exit', '0')],
+            lines = [heading(title, query, len(found)), *(preview + [' '] * (2 - len(preview))), 'One digit per letter']
+            digit = await _screen(link, say, lines, [('List', '1'), ('Erase','*'), ('Exit', '0')],
                 f'{title}. {len(found)} matches. Enter one keypad digit per letter. '
-                'Press 1 or pound to list, star to erase, or zero to cancel.')
+                'Press 1 or pound to list, star to erase, or zero to cancel.', [1,4,6])
             if digit == '0':
                 return None
             if digit == '*':

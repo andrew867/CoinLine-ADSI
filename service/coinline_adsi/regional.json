@@ -2,6 +2,25 @@
   "numbering_url": "https://www.cnac.ca/data/COCodeStatus_ALL.zip",
   "city_url": "https://weather.gc.ca/api/accesscity/en",
   "weather_url": "https://weather.gc.ca/api/app/v3/en/Location/",
+  "cinema": {
+    "nearby": "https://apis.cineplex.com/prod/cpx/theatrical/api/v1/theatres/playingnearby",
+    "showtimes": "https://apis.cineplex.com/prod/cpx/theatrical/api/v1/showtimes",
+    "regions": {
+      "NL": ["Newfoundland and Labrador", "America/St_Johns"],
+      "NS": ["Nova Scotia", "America/Halifax"],
+      "NB": ["New Brunswick", "America/Moncton"],
+      "PE": ["Prince Edward Island", "America/Halifax"],
+      "QC": ["Quebec", "America/Toronto"],
+      "ON": ["Ontario", "America/Toronto"],
+      "MB": ["Manitoba", "America/Winnipeg"],
+      "SK": ["Saskatchewan", "America/Regina"],
+      "AB": ["Alberta", "America/Edmonton"],
+      "BC": ["British Columbia", "America/Vancouver"],
+      "NT": ["Northwest Territories", "America/Yellowknife"],
+      "YT": ["Yukon", "America/Whitehorse"],
+      "NU": ["Nunavut", "America/Iqaluit"]
+    }
+  },
   "news": {
     "topstories": "https://www.cbc.ca/webfeed/rss/rss-topstories",
     "world": "https://www.cbc.ca/webfeed/rss/rss-world",

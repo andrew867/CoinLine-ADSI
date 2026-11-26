@@ -98,6 +98,7 @@
         "type": {
           "const": "menu"
         },
+        "layout": {"const": "information"},
         "lines": {
           "$ref": "#/$defs/lines"
         },
@@ -135,6 +136,7 @@
         "type": {
           "const": "message"
         },
+        "layout": {"const": "information"},
         "lines": {
           "$ref": "#/$defs/lines"
         },
@@ -178,7 +180,9 @@
             "assistant.answer",
             "airport.arrivals",
             "airport.departures",
-            "directory.lookup"
+            "directory.lookup",
+            "cinema.showtimes",
+            "parcel.track"
           ]
         },
         "args": {

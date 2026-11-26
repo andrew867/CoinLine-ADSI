@@ -42,7 +42,27 @@ def main():
                 press(call, '5', keypad.heading('Directory', '5', 1))
                 press(call, '1', 'Directory 1-1')
                 press(call, '1', 'DIRECTORY')
-    print('Verified incremental ICAO search, arrival board and directory over SIP.')
+        with provider_override(client, cinema=False, parcel=False):
+            with terminal() as call:
+                call.display('COINLINE INFOLINE', timeout=60, lines=['COINLINE INFOLINE', 'Your information', 'service. Choose a', 'service to begin.'])
+                press(call, '5', 'MORE SERVICES')
+                press(call, '4', 'Demo theatre')
+                press(call, '1', 'Demo movie')
+                press(call, '1', 'DEMO MOVIES')
+                press(call, 'k5', 'DEMO MOVIES')  # fixed Next
+                press(call, 'k4', 'DEMO MOVIES')  # fixed Prev
+                press(call, 'k6', 'MORE SERVICES')
+                press(call, '5', 'TRACK A PARCEL')
+                time.sleep(0.8)
+                for digit in '000000000001':
+                    call.press(digit)
+                call.press('k4')  # erase one digit via the actual softkey return
+                call.press('2')
+                call.press('k5')  # submit via the actual softkey return
+                call.display('CONFIRM TRACKING', timeout=30)
+                press(call, 'k1', 'DEMO FEDEX')
+                press(call, 'k6', 'MORE SERVICES')
+    print('Verified incremental ICAO search, arrival board, directory, movie paging and parcel entry over SIP.')
 
 
 if __name__ == '__main__':

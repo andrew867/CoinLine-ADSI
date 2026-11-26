@@ -343,14 +343,18 @@ class Regional:
                 return None
         return await self.cache.get(key, ttl, checked, max_age=max_age)
 
-    async def weather(self, operation, key):
+    async def coordinates(self, key):
         province, city = key.split("|", 1)
         if province not in CAPITALS or not 1 <= len(city) <= 80:
             return None
         async def resolve():
             rows = await self.json(self.catalog["city_url"], params={"query": city, "limit": 50})
             return city_coordinates(rows, province, city) if rows else None
-        coords = await self.cached(f"city:{key}", 604800, resolve, 2592000)
+        return await self.cached(f"city:{key}", 604800, resolve, 2592000)
+
+    async def weather(self, operation, key):
+        province, _ = key.split("|", 1)
+        coords = await self.coordinates(key)
         if coords is None:
             return None
         async def fetch():
@@ -456,32 +460,47 @@ class Regional:
 
 async def choose(link, say, title, entries):
     """Present a bounded paged list, preserving the active ADSI session."""
-    for start in range(0, len(entries), 2):
+    start = 0
+    if not entries:
+        return None
+    for _ in range(80):
         batch = entries[start:start + 2]
-        labels = [label for _, label in batch]
+        keys = [(f"Select{i}", str(i)) for i in range(1, len(batch)+1)]
+        slots = list(range(1, len(batch)+1))
+        if start:
+            keys.append(("Prev", "4")); slots.append(4)
         if start + 2 < len(entries):
-            labels.append("More")
-        lines = [graph.handset_text(title)[:20], *(graph.handset_text(f"{i} {label}")[:20] for i, label in enumerate(labels, 1))]
+            keys.append(("Next", "3")); slots.append(5)
+        keys.append(("Back", "0")); slots.append(6)
+        lines = [graph.handset_text(title)[:20], *(graph.handset_text(f"{i} {label}")[:20] for i, (_, label) in enumerate(batch, 1))]
+        lines += [" "] * (3-len(lines))
+        lines.append(f"Page {start//2+1}/{(len(entries)+1)//2}")
         if link.display_active:
-            await link.transfer(wire.screen(lines, [(graph.handset_text(label)[:7], str(i)) for i, label in enumerate(labels, 1)]), open_input=True)
+            await link.transfer(wire.screen(lines, keys, slots=slots), open_input=True)
         else:
             link.open_voice_input()
-            await say(title + ". " + ". ".join(f"Press {i} for {label}" for i, label in enumerate(labels, 1)))
+            await say(title + ". " + ". ".join(f"Press {i} for {label}" for i, (_, label) in enumerate(batch, 1)) +
+                      (". Press four for previous" if start else "") +
+                      (". Press three for next" if start+2 < len(entries) else "") + ". Press zero to return.")
         try:
             digit = await link.selection(30)
         except TimeoutError:
             return None
         if digit in [str(i) for i in range(1, len(batch) + 1)]:
             return batch[int(digit) - 1][0]
-        if digit != "3":
+        if digit == "3" and start + 2 < len(entries):
+            start += 2
+        elif digit == "4" and start:
+            start -= 2
+        elif digit == "0":
             return None
     return None
 
 
-async def choose_weather(link, say, location):
+async def choose_weather(link, say, location, *, title="Weather"):
     if location and location[1]:
         province, city = location
-        choice = await choose(link, say, f"Weather: {city}?", [(f"{province}|{city}", "Yes"), ("other", "Other city")])
+        choice = await choose(link, say, f"{title}: {city}?", [(f"{province}|{city}", "Yes"), ("other", "Other city")])
         if choice != "other":
             return choice
-    return await choose(link, say, "Choose weather city", [(f"{province}|{city}", f"{city}, {province}") for province, city in CAPITALS.items()])
+    return await choose(link, say, "Choose city", [(f"{province}|{city}", f"{city}, {province}") for province, city in CAPITALS.items()])

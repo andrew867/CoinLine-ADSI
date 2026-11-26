@@ -2,7 +2,7 @@
 
 [![Verification](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml/badge.svg)](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml)
 
-CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine** presents Canadian regional headlines, weather, stock quotes, lottery draw results, airport flight boards and visual directory assistance, with fixture, live or manual provenance as configured. Read-only banking is optional. Operators can build and test call flows in a browser. A standalone PJSUA2 terminal exercises signaling over SIP/RTP.
+CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine** presents Canadian regional headlines, weather, stock quotes, lottery draw results, airport flight boards, visual directory assistance, cinema showtimes and parcel tracking, with fixture, live or manual provenance as configured. Read-only banking is optional. Operators can build and test call flows in a browser. A standalone PJSUA2 terminal exercises signaling over SIP/RTP.
 
 ## Quick start
 
@@ -33,6 +33,7 @@ Open the operator console at `http://127.0.0.1:8080` and sign in with the genera
 | [Packaging and delivery](docs/plan/operations.md) | Compose topology, operations, repository split and GitHub Actions |
 | [Run the lab](docs/plan/running.md) | Build, provision and test the local service, console and emulator |
 | [Extra InfoLine services](docs/plan/extra-services.md) | Airport keypad search, flight boards, directory, optional native voicemail and resident launcher |
+| [Screenphone experience and local services](docs/plan/screenphone-experience.md) | Information-first layouts, paging, cinema and parcel tracking, credentials and qualification |
 | [CoinLine-emu PSTN integration handoff](docs/plan/millennium-interop.md) | Dedicated 2374 SIP ingress, simulator routing, PCM contract and acceptance gates |
 | [Local lab results](docs/status/local-lab.md) | Verified exchanges, recovery drills and qualification status |
 | [Canadian InfoLine lab results](docs/status/regional-lab.md) | Provider responses, caller ID, finance and regional lottery verification |

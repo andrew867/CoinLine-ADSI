@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from . import fdm, graph, providers
+from . import fdm, graph, parcel, providers
 
 
 class Login(BaseModel):
@@ -66,12 +66,50 @@ class Simulation:
     fault: str | None
     expires: float
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    parcel_digits: str = ""
+    parcel_confirm: bool = False
+    parcel_accepted: bool = False
 
     async def lookup(self, operation, arguments):
         return providers.fixture(operation, arguments, self.fault)
 
+    def parcel_entry(self):
+        node = self.instance.nodes[self.instance.node]
+        return (not self.instance.ended and node.get("operation") == "parcel.track"
+                and node["args"].get("number") == "selected" and not self.parcel_accepted)
+
+    def parcel_event(self, digit):
+        if self.parcel_confirm:
+            if digit == "1":
+                self.parcel_accepted = True
+            elif digit == "0":
+                self.instance._move(self.instance.nodes[self.instance.node]["onUnavailable"])
+            elif digit != "2":
+                return
+            self.parcel_confirm = False
+            self.parcel_digits = ""
+        elif digit == "#":
+            self.parcel_confirm = bool(parcel.NUMBER.fullmatch(self.parcel_digits))
+            if not self.parcel_confirm:
+                self.parcel_digits = ""
+        elif digit == "*":
+            if not self.parcel_digits:
+                self.instance._move(self.instance.nodes[self.instance.node]["onUnavailable"])
+            self.parcel_digits = self.parcel_digits[:-1]
+        elif digit in "0123456789" and len(self.parcel_digits) < 22:
+            self.parcel_digits += digit
+
     async def result(self):
+        if self.parcel_entry():
+            lines = parcel.confirmation(self.parcel_digits) if self.parcel_confirm else parcel.ENTRY_LINES
+            keys = parcel.CONFIRM_KEYS if self.parcel_confirm else parcel.ENTRY_KEYS
+            slots = [1,2,6] if self.parcel_confirm else [4,5]
+            return {"node": self.instance.node, "lines": lines, "choices": [
+                {"label": label, "digit": digit, "slot": slot} for (label, digit), slot in zip(keys, slots)],
+                "prompt": "Fixture only. Use a synthetic tracking number.", "page": 1, "pageCount": 1,
+                "ended": False, "trace": self.instance.trace[-64:]}
         view = await self.instance.settle(self.lookup)
+        self.parcel_accepted = False
         return {**view, "trace": self.instance.trace[-64:]}
 
 
@@ -382,6 +420,14 @@ async def event(identifier: UUID, data: SimEvent, request: Request, owner=Depend
     async with sim.lock:
         if data.hangup:
             sim.instance.ended = True
+            sim.parcel_digits = ""
+        elif sim.parcel_entry():
+            if data.timeout:
+                sim.parcel_digits = ""
+                sim.parcel_confirm = False
+                sim.instance._move(sim.instance.nodes[sim.instance.node]["onUnavailable"])
+            else:
+                sim.parcel_event(data.digit)
         elif not sim.instance.view()["ended"]:
             if data.timeout:
                 sim.instance.timeout()

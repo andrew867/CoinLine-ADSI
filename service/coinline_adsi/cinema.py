@@ -1,6 +1,7 @@
 """Read-only Cineplex listings, using an operator-authorized API credential."""
 
 import asyncio
+import math
 import os
 import re
 import textwrap
@@ -11,18 +12,39 @@ from . import graph, wire
 from .regional import choose, choose_weather
 
 
-def theatres(payload):
+def distance_km(origin, destination):
+    lat1, lon1 = map(math.radians, origin)
+    lat2, lon2 = map(math.radians, destination)
+    a = math.sin((lat2-lat1)/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin((lon2-lon1)/2)**2
+    return 6371 * 2 * math.asin(math.sqrt(min(1, max(0, a))))
+
+
+def theatres(payload, origin=None, radius=100):
     if not isinstance(payload, list):
         return None
     result = []
+    recognized = False
     for row in payload[:30]:
         if not isinstance(row, dict):
             continue
         key = str(row.get('locationId') or row.get('theatreId') or row.get('id') or '')
         name = row.get('name') or row.get('theatreName') or row.get('theatre')
         if re.fullmatch(r'[0-9]{1,10}', key) and isinstance(name, str) and name.strip():
-            result.append([key, name.strip()[:100]])
-    return result or ([] if not payload else None)
+            recognized = True
+            distance = 0
+            if origin is not None:
+                try:
+                    geo = row['location']['geoLocation']
+                    lat, lon = float(geo['latitude']), float(geo['longitude'])
+                    if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+                        continue
+                    distance = distance_km(origin, (lat, lon))
+                    if distance > radius:
+                        continue
+                except (KeyError, TypeError, ValueError):
+                    continue
+            result.append((distance, [key, name.strip()[:100]]))
+    return [item for _, item in sorted(result)] if recognized or not payload else None
 
 
 def showtimes(payload, theatre, day):
@@ -116,7 +138,8 @@ class Cinema:
             if not self.regional.cache.quota('cinema', 250, 10):
                 return None
             response = await self.regional.json(spec[operation], params=params,
-                headers={'Ocp-Apim-Subscription-Key': token}, limit=3_000_000)
+                headers={'Ocp-Apim-Subscription-Key': token, 'Accept': 'application/json',
+                         'Accept-Language': 'en'}, limit=3_000_000)
             return parser(response) if response is not None else None
         return await self.regional.cached(f'cinema:{operation}:{key}', 900, fetch, 900)
 
@@ -130,7 +153,11 @@ class Cinema:
         params = {'language': 'en', 'date': day.strftime('%m/%d/%Y'), 'city': city,
                   'region': spec['regions'][province][0], 'regionCode': province, 'country': 'Canada',
                   'latitude': lat, 'longitude': lon, 'accuracyKm': 5}
-        return await self._list('nearby', f'{place}:{day}', params, theatres)
+        radius = spec.get('radius_km', 100)
+        if type(radius) not in (int, float) or not 1 <= radius <= 500:
+            return None
+        return await self._list('nearby', f'{place}:{day}:{radius}', params,
+            lambda payload: theatres(payload, (float(lat), float(lon)), radius))
 
     async def listings(self, theatre, day):
         return await self._list('showtimes', f'{theatre}:{day}', {'language': 'en', 'locationId': theatre,

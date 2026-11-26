@@ -94,7 +94,8 @@ class ScreenphoneTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(request.url.params['latitude'],'47.588')
             self.assertEqual(request.url.params['longitude'],'-52.717')
             self.assertNotIn('postalCode',request.url.params)
-            return httpx.Response(200,json=[{'id':42,'name':'Demo Cinema'}])
+            return httpx.Response(200,json=[{'theatreId':43,'theatreName':'Distant Cinema','location': {'geoLocation': {'latitude':48.95,'longitude':-57.95}}},
+                {'theatreId':42,'theatreName':'Demo Cinema','location': {'geoLocation': {'latitude':47.56,'longitude':-52.75}}}])
         with patch.dict('os.environ',{'ADSI_CINEPLEX_API_KEY':'synthetic','ADSI_PROVIDER_CACHE_DIR':''}):
             adapter=regional.Regional()
             await adapter.client.aclose()

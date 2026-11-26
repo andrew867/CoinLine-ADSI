@@ -2,14 +2,14 @@
 
 ## Public information service
 
-The welcome screen reads `COINLINE INFOLINE`. Its numerically equivalent softkeys are `1 News`, `2 Wx`, `3 Stocks` and `4 Lotto`; `0 Exit` ends the call. Weather and lottery use a location prompt. Detail screens use paging and a return path. The optional assistant appears on a later menu page when enabled. Private banking has a dedicated entry route and authentication flow.
+The bundled travel revision welcomes the caller with `COINLINE INFOLINE`. Its softkeys are `1 News`, `2 Weather`, `3 Finance`, `4 Lotto`, `5 More` and `0 Exit`. More opens `1 Flights`, `2 Dir` (Directory), `3 Travel`, `4 Movies` and `5 Parcels`; `0 Back` returns. Travel contains road reports, ferry status, transit and the optional information assistant. Weather includes current conditions, forecast and alerts. Finance contains stocks, financial and biotech news and banking. Weather and lottery use location selection; detail screens use paging and a return path. Private banking has a dedicated entry route and authentication flow.
 
 | Operation | Initial output | Source and activation |
 | --- | --- | --- |
 | `weather.current` and `weather.forecast` | City, temperature and observation time, or forecast period and issuance time. Keep warnings distinct from routine forecasts and preserve their issue/expiry state. | ECCC MSC City Page Weather via Datamart, English XML and a configured site catalogue. |
-| `news.headlines` | Paged publisher-attributed headlines with publication times and optional licensed short descriptions. | Fixture feed at first. Licensed publisher RSS/API or a contracted source such as Reuters Connect. Approve text display, audio reading and cache rights before activation. |
-| `market.quote` | Allowlisted symbol, exchange, price, currency, source quote timestamp and feed delay or EOD status. | Fixture watchlist at first. A Canadian-market feed with rights for the selected telephone use. Record the provider's claimed delay independently of the computed age. |
-| `lottery.draw` | Operator, game, draw date, ordered numbers and separately labeled bonus fields. Optional digit entry compares a caller's selected numbers against a particular published draw. Treat the result as an informational comparison and direct callers to official ALC verification. | ALC is the initial operator. Use synthetic data or an authorized, attributable manual import until an approved feed exists. Keep tickets, barcodes, identity and claims out of the flow. |
+| `news.headlines` | Paged publisher-attributed headlines with publication times. | Synthetic, manual or configured regional and HTTPS feeds. Approve text display, audio reading and cache rights before activation. |
+| `market.quote` | Allowlisted symbol, exchange, price, currency, source quote timestamp and feed delay or EOD status. | Synthetic watchlist, manual records or configured regional feeds. Record the provider's claimed delay independently of the computed age. |
+| `lottery.draw` | Operator, game, draw date, numbers and separately labeled bonus fields. Informational results only; verify against the official lottery operator. | Synthetic, manual or supported Canadian regional feeds. See the [provider catalogue](regional-providers.md) for coverage. |
 
 [Weather and numbering](../sources.md#s7-weather-and-numbering) · [News, market and lottery](../sources.md#s8-news-market-and-lottery)
 
@@ -26,7 +26,7 @@ Provider adapters return a validated result with `status` (`fresh`, `stale` or `
 | End-of-day quotes | Show the session date and EOD label. The expected latest close comes from the licensed feed or exchange calendar. Use unavailable if the session cannot be established or the last close exceeds 7 calendar days. |
 | Lottery | Show an explicit draw date. Use the configured game schedule to label a last confirmed draw if a later result is expected. Validate corrected draws as new revisions, retaining provenance. |
 
-Use periodic refresh and request coalescing. Keep provider limits, redistribution rights, supported markets/games, source fields and expected update schedule in provider configuration. Normalize content before display, cap size and reject malformed inputs. Use a fixed public message when a source is unavailable. Demo data is labeled on every affected screen and voice response.
+Cache and coalesce provider requests. Keep provider limits, redistribution rights, supported markets/games, source fields and expected update schedule in provider configuration. Normalize content before display, cap size and reject malformed inputs. Use a fixed public message when a source is unavailable. Demo data is labeled on affected screens and voice responses.
 
 ### Graph adapter arguments
 
@@ -59,4 +59,4 @@ Keep financial payloads out of call history, recordings, public graphs, simulato
 
 ## Optional information assistant
 
-First implementation offers fixed topics and pre-authored questions through the keypad and softkeys, grounded in a curated public reference set. A provider interface permits local or hosted models. Use a bounded excerpt budget, total timeout of 5 seconds, one in-flight request per call and a deployment-wide quota. Return an answer of at most two terminal pages with a short human-readable source label and a fallback when evidence or the provider is unavailable. The assistant receives the chosen public topic and vetted excerpts. Treat imported content as data, disable tool execution and reject output that fails the response schema or source allowlist. Extend to opted-in speech only after source rights, privacy and transcripts are reviewed. Use deterministic weather, market, lottery and banking adapters for numeric results.
+The optional information assistant offers fixed topics and pre-authored questions through the keypad and softkeys, grounded in a curated public glossary. The adapter can use a configured HTTPS Chat Completions endpoint; without a model it presents the glossary text. It has a five-second timeout, bounded answers and shared request limits. The model receives only the chosen public question and vetted excerpt. Weather, market, lottery and banking results continue to use deterministic adapters.

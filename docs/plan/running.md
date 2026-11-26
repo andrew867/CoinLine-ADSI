@@ -1,6 +1,6 @@
 # Run the CoinLine ADSI lab
 
-Use Docker with Compose and Python 3.11 or later. On Windows run the commands from MSYS2 MINGW64 and make the Docker and Python executables available on its path.
+Use Docker with Compose and Python 3.11 or later. On Windows run the commands from MSYS2 MINGW64 and make the Docker and Python executables available on its path. The first build compiles Asterisk 22.12.0 and the standalone SIP handset from source and takes a long time.
 
 ```sh
 python deploy/init_lab.py
@@ -8,7 +8,7 @@ docker compose --profile verify build
 docker compose --profile verify up -d --no-build --wait app gateway reference
 ```
 
-The initializer creates an ignored `.env` with generated lab credentials. The web console listens at `http://127.0.0.1:8080`. Use the value of `ADSI_ADMIN_PASSWORD` to sign in. `ADSI_WEB_PORT` changes the local HTTP port. The lab SIP endpoint uses identity `lab` and `ADSI_SIP_PASSWORD`. SIP and RTP bind to loopback by default, and `ADSI_SIP_PORT` changes the host SIP port. The SIP test client connects over the Compose network, which also avoids restrictions of host-to-container RTP NAT. A physical path requires a verified advertised address, codec, DTMF and FXS profile.
+The initializer creates an ignored `.env` with generated lab credentials. The web console listens at `http://127.0.0.1:8080`. Use `sed -n 's/^ADSI_ADMIN_PASSWORD=//p' .env` to read only the console access code. `ADSI_WEB_PORT` changes the local HTTP port. The lab SIP endpoint uses identity `lab` and `ADSI_SIP_PASSWORD`. SIP and RTP bind to loopback by default, and `ADSI_SIP_PORT` changes the host SIP port. The SIP test client connects over the Compose network, which also avoids restrictions of host-to-container RTP NAT. A physical path requires a verified advertised address, codec, DTMF and FXS profile.
 
 | Extension | Function |
 | --- | --- |
@@ -17,7 +17,11 @@ The initializer creates an ignored `.env` with generated lab credentials. The we
 | 6502 | Synthetic balance demonstration, gated by `ADSI_DEMO_PIN` |
 | 6503 | Resident feature lab route, enabled with `ADSI_FDM_ENABLE=1` and a one-shot approval |
 | 6504 | Private local InfoLine test, enabled with `ADSI_LOCAL_PRIVATE_CALLS=1` and local banking enrollment |
+| 6505 | Optional native Asterisk voicemail access |
+| 6506 | Optional native Asterisk visual directory |
+| 6507 | Leave a message in the optional native lab mailbox |
 | 6508 | Optional ShadyBank member banking, authenticated lab SIP only; see [ShadyBank setup](shadybank.md) |
+| 2374 | Public InfoLine in the separate [CoinLine-emu overlay](millennium-interop.md) |
 
 ```sh
 sh tests/check-modules.sh
@@ -33,7 +37,7 @@ Install the service requirements to run the Python verification scripts outside 
 
 Run `sh tests/rtp-impairments.sh` on an idle, isolated reference service with Linux traffic-control support. Its helper applies seeded jitter and deterministic spill packet drops to the reference container's outgoing RTP port range, then restores its default queue. The helper needs `NET_ADMIN` in the reference container's network namespace.
 
-Open `http://127.0.0.1:8091` for the separate SIP terminal UI. Its dial, keypad, softkeys and trace control a new PJSUA2 call. The authoring console simulator instead exercises the graph with fixed fixtures. In the console, save a valid draft and publish it to apply the revision for new calls on extension 6501. Application history provides rollback to an older revision. The graph editor supports focusable nodes and explicit transition fields.
+Run `python terminal-emu/view.py` from the checkout and open `http://127.0.0.1:8091` for the separate SIP terminal UI. Dialing starts a `terminal-emu` container and its PJSUA2 call. The authoring console simulator instead exercises the graph with fixed fixtures. In Applications, save a valid draft and publish it to apply the revision for new calls on extension 6501. Application history provides rollback to an older revision. The graph editor supports focusable nodes and explicit transition fields.
 
 For extension 6501, enter an optional synthetic ten-digit caller ID in the terminal UI to exercise Canadian NPA-NXX routing; leave it blank for manual location selection. The SIP endpoint still uses the generated lab credential. The caller ID is never used as private banking authorization.
 
@@ -71,4 +75,4 @@ Use `bash deploy/backup.sh <new-backup.age> <recipient>` with an installed `age`
 
 Run `bash tests/rehearse-promotion.sh` with a Docker Engine using the containerd image store and the lab images already built. The rehearsal creates a separate Compose project and database. It promotes local images by digest, induces a failed SIP canary, restores the earlier digest pair and checks another real call.
 
-The workflow files are located at the future repository root. The release workflow requires a repository license, builds candidate images with SBOM and provenance, and qualifies those exact digests in the lab. It attaches the qualified digest pair to the GitHub release. Promotion selects that release and expects a dedicated Linux deployment runner with Docker, GitHub CLI, jq, a provisioned lab smoke client and environment protection. See [delivery requirements](operations.md) for hosted setup.
+The workflows in `.github/workflows/` verify changes, build release images with SBOM and provenance, and qualify those exact digests in the lab. The release workflow attaches the qualified digest pair to the GitHub release. Promotion selects that release and expects a dedicated Linux deployment runner with Docker, GitHub CLI, jq, a provisioned lab smoke client and environment protection. See [delivery requirements](operations.md).

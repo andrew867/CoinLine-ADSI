@@ -2,7 +2,7 @@
 
 ## Product boundary
 
-An administrator installs and provisions a small voice service. A caller dials its SIP extension through an ordinary analog handset or compatible software terminal. The service answers, determines ADSI support, and presents the published application as display screens with context-sensitive softkeys. The same public menu works through voice prompts and numeric keys when ADSI is unavailable. CoinLine InfoLine is the bundled demonstration, with English as the first supported locale and Atlantic Canada as the initial regional catalogue.
+An administrator installs and provisions a small voice service. A caller dials its SIP extension through an ordinary analog handset or compatible software terminal. The service answers, determines ADSI support, and presents the published application as display screens with context-sensitive softkeys. Public menus provide voice and numeric-key alternatives when ADSI is unavailable. CoinLine InfoLine is the bundled English-language information service, with Canadian regional feeds and separate synthetic fixtures.
 
 SDC drives the live experience. Resident FDM features are an optional lab capability with a separate release gate. Subscriber management, payphone billing, coin control, emergency calling, PSTN switching and existing CoinLine NCC table downloads are outside the project boundary.
 
@@ -23,21 +23,21 @@ SDC drives the live experience. Resident FDM features are an optional lab capabi
 | FIN-02 | Protect balances and credentials throughout enrollment, presentation, revocation, logging and recovery. |
 | AI-01 | Offer an optional public information assistant with approved context, attribution, bounded costs and an explicit unavailable response. |
 | OPS-01 | Package a local Linux service stack with Compose and document provisioning, monitoring, backups, migrations and rollback. |
-| OPS-02 | Use required GitHub checks, versioned releases and digest-based delivery once an independent repository and target environment exist. |
+| OPS-02 | Use GitHub verification, versioned releases and digest-based delivery to qualified target environments. |
 
-## Proposed architecture
+## Architecture
 
 | Component | Responsibility |
 | --- | --- |
 | Asterisk 22 LTS gateway | SIP endpoints and trunks through `res_pjsip`, SDP, RTP, dialplan admission, ARI call lifecycle and a per-call two-leg media bridge. |
-| Python service | Async call orchestration, ADSI state machine, flow interpreter, provider adapters, scheduler and a FastAPI HTTP interface. A narrow native binding supplies reusable SpanDSP tone and modem primitives. The application supplies ADSI message semantics. |
+| Python service | Async call orchestration, ADSI state machine, flow interpreter, provider adapters and a FastAPI HTTP interface. Python generates CAS, Bell 202 FSK and ADSI frames. |
 | React and TypeScript web client | Same-origin administration and subscriber enrollment, accessible flow editing, profile preview and simulator controls. Browser simulation uses the server interpreter. |
-| PostgreSQL | Immutable revisions, routing, provider configuration metadata, operator audit events and enrollment mappings. Credentials use an external key or secret mount. Audio and per-call buffers are ephemeral. |
-| Standalone terminal | C++ PJSUA2/PJMEDIA SIP client with CLI and an optional local browser UI served by the client. Independent terminal state, decoder and display logic. |
+| PostgreSQL | Immutable revisions, routing, provider configuration metadata, operator audit events and enrollment mappings. Private enrollment credentials are encrypted with the deployment key. Audio and per-call buffers are ephemeral. |
+| Standalone terminal | C++ PJSUA2/PJMEDIA SIP client with a SpanDSP receiver and independent terminal state, decoder and display logic. The Python `terminal-emu/view.py` controller serves its local browser UI. |
 
 A physical handset connects to an FXS port on an ATA or equivalent gateway. The ATA places a SIP call to Asterisk and carries CAS and FSK as in-band audio. Asterisk delivers call events over ARI and bidirectional signed linear PCM over `chan_websocket` to the service. The TCP WebSocket is internal to the deployment. The service can also run the SDC engine with a diagnostic PCM adapter. AudioSocket is a documented alternative for an interoperability spike if the primary adapter misses a media requirement. Each live adapter has to pass the same waveform and lifecycle tests. [Asterisk PJSIP](../sources.md#s1-asterisk-pjsip-ari-and-media) · [SpanDSP](../sources.md#s3-spandsp) · [PJSUA2](../sources.md#s4-pjproject)
 
-Use a modular monolith in one service process for the first release. One task owns each call's state and processes an ordered event queue. A provider lookup runs outside the media callback with cancellation and a deadline. Media overflow ends the pending transaction and enters bounded recovery. Incoming sessions have opaque IDs and bridge only their own caller and media legs. Runtime switches distinguish lab, public information and enrolled private service.
+The application runs in one service process. One task owns each call's state and processes an ordered event queue. Provider lookups run outside the media callback with cancellation and a deadline. Media overflow ends the pending transaction. Incoming sessions have opaque IDs and bridge only their own caller and media legs. Runtime switches distinguish lab, public information and enrolled private service.
 
 ## First release targets
 

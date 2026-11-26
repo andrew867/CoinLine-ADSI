@@ -69,6 +69,9 @@ class Simulation:
     parcel_digits: str = ""
     parcel_confirm: bool = False
     parcel_accepted: bool = False
+    transit_digits: str = ""
+    transit_step: int = 0
+    transit_accepted: bool = False
 
     async def lookup(self, operation, arguments):
         return providers.fixture(operation, arguments, self.fault)
@@ -99,7 +102,55 @@ class Simulation:
         elif digit in "0123456789" and len(self.parcel_digits) < 22:
             self.parcel_digits += digit
 
+    def transit_entry(self):
+        node = self.instance.nodes[self.instance.node]
+        return (not self.instance.ended and node.get("operation") == "transit.departures"
+                and node["args"].get("selection") in ("selected", "route-selected") and not self.transit_accepted)
+
+    def transit_cancel(self):
+        self.transit_digits = ""
+        self.transit_step = 0
+        self.instance._move(self.instance.nodes[self.instance.node]["onUnavailable"])
+
+    def transit_event(self, digit):
+        if self.instance.nodes[self.instance.node]["args"]["selection"] == "route-selected":
+            if digit == "0":
+                self.transit_cancel()
+            elif digit == "1":
+                if self.transit_step == 0:
+                    self.transit_step = 1
+                else:
+                    self.transit_accepted = True
+            return
+        if digit == "#":
+            if self.transit_digits == "9000":
+                self.transit_accepted = True
+            else:
+                self.transit_cancel()
+        elif digit == "*":
+            if self.transit_digits:
+                self.transit_digits = self.transit_digits[:-1]
+            else:
+                self.transit_cancel()
+        elif digit in "0123456789":
+            if len(self.transit_digits) >= 8:
+                self.transit_cancel()
+            else:
+                self.transit_digits += digit
+
     async def result(self):
+        if self.transit_entry():
+            if self.instance.nodes[self.instance.node]["args"]["selection"] == "route-selected":
+                lines = (["Demo route", "1 9 Demo Mall", "Page 1/1"] if self.transit_step==0 else
+                         ["Demo stop", "1 9000 Demo Harbour", "Page 1/1"])
+                keys, slots = [("Select1","1"),("Back","0")], [1,6]
+            else:
+                lines = ["BUS STOP", "Enter stop number", "Submit when ready", "Demo: 9000"]
+                keys, slots = [("Erase","*"),("Submit","#")], [4,5]
+            return {"node": self.instance.node, "lines": lines, "choices": [
+                {"label": label, "digit": digit, "slot": slot} for (label,digit),slot in zip(keys,slots)],
+                "prompt": "Fixture only. Use the demonstration stop or route.", "page":1,"pageCount":1,
+                "ended":False,"trace":self.instance.trace[-64:]}
         if self.parcel_entry():
             lines = parcel.confirmation(self.parcel_digits) if self.parcel_confirm else [
                 parcel.ENTRY_LINES[0], "Demo: sample number", *parcel.ENTRY_LINES[2:]]
@@ -111,6 +162,9 @@ class Simulation:
                 "ended": False, "trace": self.instance.trace[-64:]}
         view = await self.instance.settle(self.lookup)
         self.parcel_accepted = False
+        self.transit_accepted = False
+        self.transit_digits = ""
+        self.transit_step = 0
         return {**view, "trace": self.instance.trace[-64:]}
 
 
@@ -422,6 +476,12 @@ async def event(identifier: UUID, data: SimEvent, request: Request, owner=Depend
         if data.hangup:
             sim.instance.ended = True
             sim.parcel_digits = ""
+            sim.transit_digits = ""
+        elif sim.transit_entry():
+            if data.timeout:
+                sim.transit_cancel()
+            else:
+                sim.transit_event(data.digit)
         elif sim.parcel_entry():
             if data.timeout:
                 sim.parcel_digits = ""

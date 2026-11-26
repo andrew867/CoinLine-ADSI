@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import directory, fdm, flights, graph, parcel
+from . import directory, fdm, flights, graph, parcel, travel
 from .api import api, login
 from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
@@ -18,7 +18,7 @@ from .link import CONTINUOUS_DATA, lab_call
 from .private import PrivateBalances, configure
 from .providers import Providers, choose_site, prefix
 from .regional import CAPITALS, choose, choose_weather
-from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, SCREENPHONE_REVISION, Store, StoreError
+from .store import DEMO_REVISION, LEGACY_DEMO_REVISION, SERVICES_REVISION, SCREENPHONE_REVISION, TRAVEL_REVISION, Store, StoreError
 
 
 @asynccontextmanager
@@ -75,7 +75,12 @@ async def lifespan(app: FastAPI):
         resolved = False
         assistant_used = False
         document = revision["graph"]
-        if revision["id"] in (SERVICES_REVISION, SCREENPHONE_REVISION) and not config.get("assistant"):
+        if revision["id"] == TRAVEL_REVISION and not config.get("assistant"):
+            travel_menu = next(node for node in document["nodes"] if node["id"] == "travel")
+            travel_menu["choices"] = [choice for choice in travel_menu["choices"] if choice["target"] != "help"]
+            travel_menu["prompt"] = "Local travel. Press one for roads, two for ferry status, three for transit, or zero to return."
+            document["nodes"] = [node for node in document["nodes"] if node["id"] not in ("help", "help-result")]
+        elif revision["id"] in (SERVICES_REVISION, SCREENPHONE_REVISION) and not config.get("assistant"):
             services = next(node for node in document["nodes"] if node["id"] == "services")
             services["choices"] = [choice for choice in services["choices"] if choice["target"] != "help"]
             if revision["id"] == SERVICES_REVISION:
@@ -110,6 +115,9 @@ async def lifespan(app: FastAPI):
                     return None
                 number = await parcel.collect(link, say, demo=not live_parcel)
                 return {"number": number} if number else None
+            if operation == "transit.departures" and arguments.get("selection") in ("selected", "route-selected"):
+                selection = await providers.transit.prepare(arguments["selection"], link, say, providers.travel_enabled(config, operation))
+                return {"selection": selection} if selection else None
             if regional and not resolved:
                 resolved = True
                 try:
@@ -117,6 +125,18 @@ async def lifespan(app: FastAPI):
                         inferred = await regional.location(prefix(caller))
                 except TimeoutError:
                     pass
+            if operation in travel.ROAD_OPERATIONS or operation in ("weather.alerts", "transit.bulletins"):
+                if arguments.get("selection") != "selected":
+                    return arguments
+                enabled = providers.travel_enabled(config, operation)
+                if enabled and not regional:
+                    return None
+                if operation == "weather.alerts":
+                    selection = await providers.travel.prepare_alerts(link, say, inferred, enabled)
+                else:
+                    kind = travel.ROAD_OPERATIONS.get(operation, "bulletins")
+                    selection = await providers.travel.prepare(kind, link, say, inferred, enabled)
+                return {"selection": selection} if selection else None
             if operation == "cinema.showtimes" and arguments.get("selection") == "selected":
                 enabled = providers.cinema_enabled(config)
                 if enabled and not regional:

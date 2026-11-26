@@ -37,6 +37,8 @@ const operations: Record<string, string> = {
   "market.quote": "instrument", "lottery.draw": "game", "assistant.answer": "question",
   "airport.arrivals": "airport", "airport.departures": "airport", "directory.lookup": "number",
   "cinema.showtimes": "selection", "parcel.track": "number",
+  "travel.road": "selection", "travel.events": "selection", "travel.advisories": "selection",
+  "travel.ferries": "selection", "weather.alerts": "selection", "transit.bulletins": "selection", "transit.departures": "selection",
 };
 const titles = { menu: "Menu", message: "Screen", provider: "Data", end: "End call" };
 
@@ -213,6 +215,7 @@ function App() {
             setSettings({ value, generation: result.generation }); setStatus("Configuration saved.");
           })}>Apply</button>
         </div>
+        <p>Data used in this product or service is provided by Metrobus Transit, however Metrobus Transit assumes no responsibility for the accuracy or currency of the Data used in this product or service. <a href="https://www.metrobus.com/gtfs.asp">Transit data licence</a>.</p>
       </section>
       <section className="panel"><h2>Resident feature download</h2>
         <p>Disposable test slot CL01. An approval permits one download call to 6503.</p>

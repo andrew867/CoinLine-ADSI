@@ -28,6 +28,13 @@ ARGUMENTS = {
     "directory.lookup": ({"number"}, set()),
     "cinema.showtimes": ({"selection"}, set()),
     "parcel.track": ({"number"}, set()),
+    "travel.road": ({"selection"}, set()),
+    "travel.events": ({"selection"}, set()),
+    "travel.advisories": ({"selection"}, set()),
+    "travel.ferries": ({"selection"}, set()),
+    "weather.alerts": ({"selection"}, set()),
+    "transit.bulletins": ({"selection"}, set()),
+    "transit.departures": ({"selection"}, set()),
 }
 OUTPUTS = {
     "weather.current": {"place", "temperatureText", "localTime", "displayTitle", "source"},
@@ -41,6 +48,9 @@ OUTPUTS = {
     "directory.lookup": {"name", "number", "detail", "source", "displayTitle"},
     "cinema.showtimes": {"displayTitle", "theatre", "movie", "date", "source", *(f"times{i}" for i in range(1, 7))},
     "parcel.track": {"displayTitle", "status", "updated", "estimate", "source"},
+    **{operation: {"displayTitle", "subject", "status", "updated", "source", *(f"detail{i}" for i in range(1,7))}
+       for operation in ("travel.road", "travel.events", "travel.advisories", "travel.ferries", "weather.alerts", "transit.bulletins")},
+    "transit.departures": {"displayTitle", "stop", "source", "updated", *(f"departure{i}" for i in range(1,7))},
 }
 
 
@@ -216,7 +226,8 @@ class Session:
             result = None
             if arguments is not None:
                 try:
-                    timeout = (20 if current["operation"] in ("cinema.showtimes", "parcel.track") else
+                    timeout = (20 if current["operation"] in ("cinema.showtimes", "parcel.track", "weather.alerts") or
+                               current["operation"].startswith(("travel.", "transit.")) else
                                12 if current["operation"].startswith("airport.") else
                                5 if current["operation"] == "assistant.answer" else provider_timeout)
                     async with asyncio.timeout(timeout):

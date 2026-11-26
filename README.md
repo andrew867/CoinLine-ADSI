@@ -2,11 +2,11 @@
 
 CoinLine ADSI is a lab server that paints menus on Analog Display Services Interface (ADSI) telephones during a call. It is for telephone collectors, telephony hobbyists and anyone interested in making 1990s screenphones useful again. The server sends display text and softkey assignments as audio, and listens for the phone's keypad and softkey tones.
 
-It is a companion to CoinLine, the payphone management and calling system, and CoinLine-emu, the payphone and central office simulator. It runs independently of both. Try it without a vintage telephone using the included software SIP handset.
+It is a companion to [CoinLine](https://github.com/andrew867/CoinLine), the payphone management and calling system, and [CoinLine-emu](https://github.com/andrew867/CoinLine-emu), the payphone and central office simulator. It runs independently of both. Payphone billing, coin control and terminal management belong to CoinLine; this is a lab information service, not a telephone switch. Try it without a vintage telephone using the included software SIP handset.
 
 [![Verification](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml/badge.svg)](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml) [MIT License](LICENSE)
 
-The bundled **InfoLine** application provides Canadian news, weather, stock quotes, lottery results, flight information, local directory search, road and ferry reports, transit schedules, cinema showtimes and parcel tracking. The default uses synthetic data. Private banking and the separate ShadyBank virtual-credit service are optional.
+The bundled **InfoLine** application provides Canadian news, weather, stock quotes, lottery results, flight information, local directory search, road and ferry reports, transit schedules, cinema showtimes and parcel tracking. The default uses labelled synthetic demo data. Read-only SimpleFIN banking and the separate ShadyBank virtual-credit service are optional and off by default.
 
 ## Quick start
 
@@ -29,7 +29,7 @@ sed -n 's/^ADSI_ADMIN_PASSWORD=//p' .env
 ```
 
 1. Open the [operator console](http://127.0.0.1:8080) and sign in with that code. **Applications** is the graph editor, revision history and fixture simulator. **Setup** shows incoming routes and lets you validate and save provider settings and configure the resident feature.
-2. From the checkout, run `python terminal-emu/view.py` in a separate shell and open the [SIP handset](http://127.0.0.1:8091). This local web UI starts the `terminal-emu` container when you dial; it makes an actual SIP call over the Docker network rather than just previewing a graph.
+2. From the checkout, run `python terminal-emu/view.py` in a separate shell and open the [SIP handset](http://127.0.0.1:8091). Leave the script running; Compose does not publish port 8091. The local web UI starts the `terminal-emu` container when you dial; it makes an actual SIP call over the Docker network rather than just previewing a graph.
 3. Dial **6501** for InfoLine. Use the onscreen softkeys or the numeric keypad to navigate. No live provider keys or real accounts are required.
 
 The welcome screen reads `COINLINE INFOLINE`. Its keys are 1 News, 2 Weather, 3 Finance, 4 Lotto, 5 More and 0 Exit. More opens Flights, Directory (Dir), Travel, Movies and Parcels. Travel contains road conditions, ferry status and transit; weather alerts are under Weather. The optional information assistant is under Travel. User-published application revisions can change the menus.
@@ -51,7 +51,7 @@ The handset UI accepts an optional synthetic caller ID. A configured NPA-NXX ass
 | 6508 | ShadyBank card/PIN, balance, history, holds and transfers | `ADSI_SHADYBANK_MODE=demo` or `live` |
 | 2374 | InfoLine from CoinLine-emu | Separate `compose.emu.yaml` instance only |
 
-The standard extensions require the authenticated `lab` SIP endpoint. The emulator-only 2374 route cannot reach the private, download or native mail extensions. See [running the lab](docs/plan/running.md), [native mail and resident features](docs/plan/extra-services.md) and [ShadyBank](docs/plan/shadybank.md) for setup instructions.
+The standard extensions require the authenticated `lab` SIP endpoint. The emulator-only 2374 route cannot reach any of extensions 6500-6508. See [running the lab](docs/plan/running.md), [native mail and resident features](docs/plan/extra-services.md) and [ShadyBank](docs/plan/shadybank.md) for setup instructions.
 
 ## Connecting a telephone
 
@@ -65,13 +65,15 @@ docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profil
 docker compose -p coinline-adsi-emu -f compose.yaml -f compose.emu.yaml --profile verify up -d --no-build --wait gateway app
 ```
 
-Map the desired dialled number in the central office simulator to `sip:2374@127.0.0.1:5069`, with SIP From user `co`, UDP, PCMU and in-band DTMF. There is no SIP registration or Digest authentication on this named local endpoint. Keep it on host loopback. The separate console is at [127.0.0.1:8089](http://127.0.0.1:8089), with negotiated RTP ports in 18100-18139. For an emulated terminal that requires voice between screens, set `ADSI_EMU_INTERACTION_PROFILE=voice-between-screens` when starting that overlay. See the [emulator connection contract](docs/plan/millennium-interop.md).
+Map the desired dialled number in the central office simulator to `sip:2374@127.0.0.1:5069`, with SIP From user `co`, UDP, PCMU (20 ms RTP packets) and in-band DTMF. There is no SIP registration or Digest authentication on this named local endpoint. Keep it on host loopback. The separate console is at [127.0.0.1:8089](http://127.0.0.1:8089). Use the negotiated SDP media port in the host RTP range 18100-18139.
+
+The overlay defaults to a synthetic caller ID of `7095550100` (`ADSI_EMU_CALLER_ID`), a first-alert delay of 1000 ms (`ADSI_EMU_ALERT_DELAY_MS`), `continuous-data` interaction (`ADSI_EMU_INTERACTION_PROFILE`) and console port 8089 (`ADSI_EMU_WEB_PORT`). For a terminal that requires voice between screens, select `voice-between-screens`. See the [emulator connection contract](docs/plan/millennium-interop.md).
 
 ### A real ADSI phone
 
 Connect the phone to the FXS port of an analog telephone adapter (ATA). Use an authenticated SIP peer with username `lab` and the generated `ADSI_SIP_PASSWORD` to call 6501 on port 5060. SIP and RTP bind to loopback by default; for a physical ATA, configure a reachable local bind address (`ADSI_BIND`) and verify the advertised media address and two-way RTP. Do not expose this lab to the public internet.
 
-- Select G.711 PCMU (also called mu-law or `ulaw`) and in-band DTMF. Disable echo cancellation and, where available, silence suppression for the test.
+- Select G.711 PCMU (also called mu-law or `ulaw`) and in-band DTMF. Disable echo cancellation, silence suppression and automatic gain control where possible; avoid codec switching for the test.
 - ADSI data travels in the voice channel: CAS, Bell 202 FSK and the phone's DTMF acknowledgments must survive the ATA and SIP media path intact.
 - Vista 350 and ADSI-capable Millennium are target devices, but neither is physically qualified yet. The standalone SIP handset, native Asterisk reference and one terminal-in-emulator interactive profile have separate verified results. See [protocol and qualification](docs/spec/adsi-protocol.md) and [emulator results](docs/status/voice-profile-lab.md).
 
@@ -92,9 +94,13 @@ flowchart LR
 
 The standard and CoinLine-emu gateways are separate instances when both configurations are running. Asterisk handles calls and audio transport. The Python service creates ADSI messages, runs applications and retrieves data. PostgreSQL stores application revisions and settings. Synthetic provider and wire fixtures are JSON files under [`fixtures/`](fixtures/README.md), not a separate Compose service.
 
+On an answered call, the service sends a CAS alert and waits for DTMF `A` from the phone. It sends display and softkey data using Bell 202 FSK at 1200 bit/s, and the phone acknowledges an accepted frame with `D1`. Subsequent keypad or softkey digits drive the application. With no ADSI capability reply, public menus can use voice prompts and the keypad instead.
+
 ## App environment
 
 The following variables are passed to the `app` container by `compose.yaml`. Values marked generated come from `deploy/init_lab.py`; blank means an optional setting is unset. Put local settings in `.env`, never commit credentials, and recreate the app after changing its environment (`docker compose up -d --wait app`). For provider-specific activation, use the corresponding Setup configuration as described in [the run guide](docs/plan/running.md).
+
+The host port settings are `ADSI_SIP_PORT` (5060) and `ADSI_WEB_PORT` (8080). `ADSI_BIND` defaults to `127.0.0.1` for SIP and RTP. These are Compose publication settings, not additional app environment variables.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -126,6 +132,7 @@ The following variables are passed to the `app` container by `compose.yaml`. Val
 ## Troubleshooting
 
 - **Build still running:** the first Asterisk and handset builds compile native software. Allow them to finish. Check `docker compose ps -a` if startup fails and `docker compose logs --tail=100 app gateway` for the cause.
+- **Compose reports a missing password:** run `python deploy/init_lab.py` from the repository root. It fills in missing settings and preserves existing ones.
 - **Cannot sign in:** make sure you are using `ADSI_ADMIN_PASSWORD`, not the SIP password or demo PIN. The initializer preserves existing values.
 - **Handset will not dial:** start `terminal-emu/view.py` from the checkout and confirm Docker is running. The verification profile must have built `terminal-emu`. Dial 6500 to check the basic exchange.
 - **Voice but no display:** verify PCMU, in-band DTMF, two-way audio and the absence of echo cancellation. Check the CAS/A, FSK and D1 exchange on a synthetic lab call. If the phone does not acknowledge, the public application can fall back to voice.
@@ -146,7 +153,7 @@ PYTHONPATH=service python -m unittest discover -s tests -v
 python tests/check_design.py
 ```
 
-GitHub Actions also builds the lab and tests real SIP calls, the browser console, the emulator ingress and the optional native Asterisk modules. The software test results are not evidence of physical handset compatibility.
+The optional native Asterisk comparator is the `reference` service in the `verify` profile. To run the full SIP smoke test, build and start it alongside the app and gateway as described in [the run guide](docs/plan/running.md), then run `sh tests/smoke.sh`. GitHub Actions also tests real SIP calls, the browser console, the emulator ingress and the optional native Asterisk modules. The software test results are not evidence of physical handset compatibility.
 
 ## Glossary
 
@@ -157,11 +164,13 @@ GitHub Actions also builds the lab and tests real SIP calls, the browser console
 | SDC / FDM | Server Display Control / Feature Download Management, live screens and resident feature downloads |
 | CPE | Customer Premises Equipment, here the telephone or terminal |
 | SIP / RTP / UDP | Session Initiation Protocol / Real-time Transport Protocol / User Datagram Protocol, call signaling and media transport |
+| SDP | Session Description Protocol, describes media addresses, ports and codecs |
 | DTMF | Dual-Tone Multi-Frequency, keypad, softkey return and acknowledgment tones |
 | PCM / PCMU | Pulse-Code Modulation / mu-law PCM (G.711), the digital audio format |
 | ARI / API / REST | Asterisk REST Interface / Application Programming Interface / Representational State Transfer |
 | FXS / ATA | Foreign Exchange Station / Analog Telephone Adapter, the analog subscriber port and SIP adapter |
 | NPA-NXX | Numbering Plan Area (area code) and central office exchange code, the first six digits of a North American number |
+| SDMF / MDMF / VMWI | Single Data Message Format / Multiple Data Message Format / Visual Message Waiting Indicator, caller ID and message waiting formats outside this off-hook ADSI subset |
 | HTTP / HTTPS / TLS | Hypertext Transfer Protocol / HTTP Secure / Transport Layer Security |
 | OIDC | OpenID Connect, optional web sign-in |
 | JSON / RSS / GTFS | JavaScript Object Notation / Really Simple Syndication / General Transit Feed Specification |

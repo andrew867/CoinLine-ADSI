@@ -91,7 +91,8 @@ jobs:
         if: failure()
         run: |
           docker compose --profile verify ps -a
-          docker compose logs --tail=80 app migrate
+          docker compose logs --tail=80 app migrate gateway
+          docker compose exec -T gateway asterisk -rx 'ari show apps' || true
   native-mail:
     runs-on: ubuntu-latest
     timeout-minutes: 45

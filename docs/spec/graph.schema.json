@@ -182,7 +182,14 @@
             "airport.departures",
             "directory.lookup",
             "cinema.showtimes",
-            "parcel.track"
+            "parcel.track",
+            "travel.road",
+            "travel.events",
+            "travel.advisories",
+            "travel.ferries",
+            "weather.alerts",
+            "transit.bulletins",
+            "transit.departures"
           ]
         },
         "args": {

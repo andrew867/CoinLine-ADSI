@@ -53,6 +53,25 @@ class GraphTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ConsoleTests(unittest.TestCase):
+    def test_transit_stop_and_route_simulation(self):
+        document = json.loads((ROOT / "service/coinline_adsi/infoline-travel.json").read_text(encoding="utf-8"))
+        with patch.dict("os.environ", {"ADSI_ADMIN_PASSWORD": "synthetic-console"}), TestClient(app) as client:
+            client.post("/api/v1/session", headers=HEADERS, json={"password": "synthetic-console"}).raise_for_status()
+            response = client.post("/api/v1/simulations", headers=HEADERS, json={"graph": document}).raise_for_status()
+            path=f"/api/v1/simulations/{response.json()['id']}/events"
+            def press(digit):
+                return client.post(path,headers=HEADERS,json={"digit":digit}).raise_for_status().json()
+            for digit in "533":
+                press(digit)
+            self.assertEqual(press('1')['lines'][0],'BUS STOP')
+            for digit in '9000':
+                press(digit)
+            self.assertEqual(press('#')['lines'][0],'DEMO BUS SCHEDULE')
+            self.assertEqual(press('0')['node'],'transit')
+            self.assertEqual(press('2')['lines'][0],'Demo route')
+            self.assertEqual(press('1')['lines'][0],'Demo stop')
+            self.assertEqual(press('1')['lines'][0],'DEMO BUS SCHEDULE')
+
     def test_screenphone_parcel_simulation(self):
         document = json.loads((ROOT / "service/coinline_adsi/infoline-screenphone.json").read_text(encoding="utf-8"))
         with patch.dict("os.environ", {"ADSI_ADMIN_PASSWORD": "synthetic-console"}), TestClient(app) as client:

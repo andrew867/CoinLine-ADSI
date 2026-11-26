@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 import httpx
 from defusedxml import ElementTree
 
-from . import cinema, directory, flights, graph, livefeeds, parcel, wire
+from . import cinema, directory, flights, graph, livefeeds, parcel, transit, travel, wire
 from .assistant import InformationDesk
 from .link import Link
 from .regional import Regional
@@ -42,6 +42,14 @@ def fixture(operation, args, fault=None):
         return cinema.fixture()
     if operation == "parcel.track":
         return parcel.fixture()
+    if operation in travel.ROAD_OPERATIONS:
+        return travel.fixture(travel.ROAD_OPERATIONS[operation])
+    if operation == "weather.alerts":
+        return travel.fixture("alerts")
+    if operation == "transit.bulletins":
+        return travel.fixture("bulletins")
+    if operation == "transit.departures":
+        return transit.fixture()
     if operation == "weather.current":
         case = 1 if fault == "stale" else 0
         with (FIXTURE_ROOT / "providers/weather.json").open(encoding="utf-8") as source:
@@ -64,12 +72,12 @@ def fixture(operation, args, fault=None):
 
 
 def check_config(config: dict) -> None:
-    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional", "flights", "directory", "cinema", "parcel"}:
+    if set(config) - {"sites", "prefixes", "manual", "assistant", "feeds", "regional", "flights", "directory", "cinema", "parcel", "nl511", "metrobus", "weatherAlerts"}:
         raise ValueError("Unknown provider configuration field.")
     if type(config.get("flights", False)) is not bool:
         raise ValueError("Flights configuration is a boolean.")
-    if any(type(config.get(key, False)) is not bool for key in ("cinema", "parcel")):
-        raise ValueError("Cinema and parcel configuration must be boolean.")
+    if any(type(config.get(key, False)) is not bool for key in ("cinema", "parcel", "nl511", "metrobus", "weatherAlerts")):
+        raise ValueError("Service activation settings must be boolean.")
     if "directory" in config:
         directory.validate(config["directory"])
     if type(config.get("regional", True)) is not bool:
@@ -135,6 +143,8 @@ class Providers:
         self.regional = Regional() if os.getenv("ADSI_REGIONAL_ENABLE") == "1" else None
         self.cinema = cinema.Cinema(self.regional)
         self.parcel = parcel.Parcel(self.client)
+        self.travel = travel.Travel(self.regional)
+        self.transit = transit.Transit(self.regional)
 
     def regional_enabled(self, config):
         return self.regional is not None and config.get("regional", True)
@@ -143,6 +153,13 @@ class Providers:
     def cinema_enabled(config):
         # Explicit operator setting takes precedence; supplying a key provisions the service by default.
         return config.get("cinema", bool(os.getenv("ADSI_CINEPLEX_API_KEY")))
+
+    def travel_enabled(self, config, operation):
+        if operation in travel.ROAD_OPERATIONS:
+            return config.get("nl511", bool(os.getenv("ADSI_NL511_KEY")))
+        if operation == "weather.alerts":
+            return config.get("weatherAlerts", self.regional_enabled(config))
+        return config.get("metrobus", os.getenv("ADSI_METROBUS_ENABLE") == "1")
 
     async def _weather(self, site):
         now = datetime.now(UTC)
@@ -188,6 +205,14 @@ class Providers:
             return await self.cinema.lookup(key, enabled)
         if operation == "parcel.track":
             return await self.parcel.lookup(key, config.get("parcel", False))
+        if operation in travel.ROAD_OPERATIONS or operation in ("weather.alerts", "transit.bulletins"):
+            enabled = self.travel_enabled(config, operation)
+            if enabled and not self.regional_enabled(config):
+                return None
+            kind = travel.ROAD_OPERATIONS.get(operation, "alerts" if operation == "weather.alerts" else "bulletins")
+            return await self.travel.lookup(kind, key, enabled)
+        if operation == "transit.departures":
+            return await self.transit.lookup(key, self.travel_enabled(config, operation))
         if operation.startswith("weather.") and key in config.get("sites", {}):
             return await self._weather_result(operation, config["sites"][key])
         if operation == "assistant.answer":
@@ -289,6 +314,8 @@ class Providers:
                 config = await config_source()
                 if self.regional_enabled(config["value"]):
                     await self.regional.numbering()
+                if self.travel_enabled(config["value"], "transit.departures"):
+                    await self.transit.load()
                 for site in config["value"].get("sites", {}).values():
                     try:
                         async with asyncio.timeout(5):

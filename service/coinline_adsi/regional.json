@@ -2,6 +2,15 @@
   "numbering_url": "https://www.cnac.ca/data/COCodeStatus_ALL.zip",
   "city_url": "https://weather.gc.ca/api/accesscity/en",
   "weather_url": "https://weather.gc.ca/api/app/v3/en/Location/",
+  "travel": {
+    "roads": "https://511nl.ca/api/v3/get/winterroads",
+    "events": "https://511nl.ca/api/v2/get/event",
+    "advisories": "https://511nl.ca/api/v2/get/alerts",
+    "ferries": "https://511nl.ca/api/v2/get/ferryterminals",
+    "bulletins": "https://www.metrobus.com/apilive/requests/bulletins/",
+    "metrobus_gtfs": "https://www.metrobustransit.ca/google/google_transit.zip",
+    "weather_alerts": "https://api.weather.gc.ca/collections/weather-alerts/items"
+  },
   "cinema": {
     "radius_km": 100,
     "nearby": "https://apis.cineplex.com/prod/cpx/theatrical/api/v1/theatres/playingnearby",

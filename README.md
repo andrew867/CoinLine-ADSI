@@ -145,7 +145,7 @@ The host port settings are `ADSI_SIP_PORT` (5060) and `ADSI_WEB_PORT` (8080). `A
 - [Data and access](docs/spec/data-and-access.md), [regional providers](docs/spec/regional-providers.md), [screenphone services](docs/plan/screenphone-experience.md), [NL travel](docs/plan/nl-travel.md), [ShadyBank](docs/plan/shadybank.md)
 - [Local lab results](docs/status/local-lab.md), [Canadian provider tests](docs/status/regional-lab.md), [sources](docs/sources.md)
 
-To run the 79 Python unit tests and design checks without a SIP server:
+To run the 82 Python unit tests and design checks without a SIP server:
 
 ```sh
 python -m pip install -r service/requirements.txt

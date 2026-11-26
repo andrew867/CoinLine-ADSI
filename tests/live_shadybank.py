@@ -59,7 +59,25 @@ def main():
         press(call,'k6','DEMO SHADYBANK')
         press(call,'k6','GOODBYE')
         assert call.process.wait(timeout=20)==0
-    print('Verified ShadyBank member login, cancelled and posted transfers, both balances, history, holds and release over SIP.')
+    # Distribute the failed attempts over distinct calls, then use the correct PIN.
+    # The locked caller must still receive the same generic prompt and no member menu.
+    with terminal('6508') as call:
+        call.display('DEMO SHADYBANK',timeout=60)
+        for attempt in range(2):
+            enter(call,CARD,'MEMBER PIN')
+            enter(call,'000000','LOGIN FAILED')
+            if attempt==0:
+                press(call,'k1','DEMO SHADYBANK')
+        press(call,'k6','GOODBYE')
+        assert call.process.wait(timeout=20)==0
+    for pin in ('000000', PIN):
+        with terminal('6508') as call:
+            call.display('DEMO SHADYBANK',timeout=60)
+            enter(call,CARD,'MEMBER PIN')
+            enter(call,pin,'LOGIN FAILED')
+            press(call,'k6','GOODBYE')
+            assert call.process.wait(timeout=20)==0
+    print('Verified ShadyBank member login, transfers, both balances, history, holds, cross-call PIN lockout and release over SIP.')
 
 
 if __name__=='__main__':

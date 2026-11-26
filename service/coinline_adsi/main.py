@@ -28,7 +28,7 @@ async def lifespan(app: FastAPI):
     app.state.failures = deque()
     app.state.db = Store() if os.getenv("ADSI_DB_HOST") else None
     app.state.providers = Providers()
-    app.state.shadybank, app.state.shadybank_demo = shadybank.configured(app.state.providers.client)
+    app.state.shadybank, app.state.shadybank_demo = shadybank.configured(app.state.providers.client, app.state.db)
     private_key = app.state.oidc[2] if app.state.oidc else (
         bytes.fromhex(os.environ["ADSI_DATA_KEY"]) if os.getenv("ADSI_LOCAL_BANK_ENROLLMENT") == "1" else None)
     app.state.private = PrivateBalances(app.state.db, app.state.providers.client, private_key) if (

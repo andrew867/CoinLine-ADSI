@@ -209,12 +209,16 @@ class Approvals:
         self.pending = {key: entry for key, entry in self.pending.items() if entry.expires > now}
         if len(self.pending) >= 128 or any(entry.subject == subject for entry in self.pending.values()):
             raise ValueError("Approval already pending.")
+        challenge = self.challenge()
+        self.pending[challenge] = Approval(subject, call, now + 120)
+        return challenge
+
+    def challenge(self) -> str:
+        """Return a display challenge; only new() creates an approvable entry."""
         while True:
             challenge = f"{secrets.randbelow(10**8):08d}"
             if challenge not in self.pending:
-                break
-        self.pending[challenge] = Approval(subject, call, now + 120)
-        return challenge
+                return challenge
 
     def approve(self, challenge, subject):
         entry = self.pending.get(challenge)

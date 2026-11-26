@@ -280,13 +280,31 @@ class BalanceTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(seen[0][2], seen[1][2])
         self.assertIsNone(seen[2][2])
 
-    def test_private_enrollment_is_disabled_without_explicit_configuration(self):
-        from fastapi import FastAPI
-        app = FastAPI()
-        routes = list(app.routes)
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertIsNone(configure(app))
-        self.assertEqual(app.routes, routes)
+    def test_private_enrollment_disabled_and_default_console_origin(self):
+        from fastapi import FastAPI, HTTPException, Request
+        from coinline_adsi.api import check_write
+
+        def request(origin):
+            return Request({"type": "http", "method": "POST", "scheme": "http", "path": "/api/v1/session",
+                            "server": ("127.0.0.1", 8080), "headers": [
+                                (b"host", b"127.0.0.1:8080"), (b"origin", origin.encode()),
+                                (b"x-coinline-csrf", b"request")]})
+
+        for configuration in ({}, {"ADSI_WEB_ORIGIN": "", "ADSI_OIDC_DISCOVERY": "",
+                                     "ADSI_OIDC_OPERATOR_SUBJECTS": "", "ADSI_PRIVATE_BALANCES": "0"}):
+            with self.subTest(configuration=configuration), patch.dict(os.environ, configuration, clear=True):
+                app = FastAPI()
+                routes = list(app.routes)
+                self.assertIsNone(configure(app))
+                self.assertEqual(app.routes, routes)
+                check_write(request("http://127.0.0.1:8080"))
+                with self.assertRaises(HTTPException) as denied:
+                    check_write(request("https://example.invalid"))
+                self.assertEqual(denied.exception.status_code, 403)
+        with patch.dict(os.environ, {"ADSI_WEB_ORIGIN": "https://console.example.test/"}, clear=True):
+            check_write(request("https://console.example.test"))
+            with self.assertRaises(HTTPException):
+                check_write(request("http://127.0.0.1:8080"))
 
     async def test_endpoint_allowlist_and_redirects(self):
         bad = base64.b64encode(b"https://example.invalid/simplefin/claim/demo").decode()

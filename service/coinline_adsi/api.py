@@ -172,7 +172,7 @@ def check_write(request: Request) -> None:
     if request.headers.get("x-coinline-csrf") != "request":
         raise HTTPException(403, "Same-origin request required.")
     origin = request.headers.get("origin")
-    expected = os.getenv("ADSI_WEB_ORIGIN", str(request.base_url).rstrip("/"))
+    expected = (os.getenv("ADSI_WEB_ORIGIN") or str(request.base_url)).rstrip("/")
     if origin and origin != expected:
         raise HTTPException(403, "Same-origin request required.")
 

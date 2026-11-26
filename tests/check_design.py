@@ -36,6 +36,19 @@ def check_links():
                 assert unquote(target.fragment) in anchors, (page.name, link)
 
 
+def check_readme_app_environment():
+    compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+    app = compose.split("\n  app:\n", 1)[1].split("\n  migrate:\n", 1)[0]
+    environment = app.split("\n    environment:\n", 1)[1].split("\n    volumes:", 1)[0]
+    passed = set(re.findall(r"^      (ADSI_[A-Z0-9_]+):", environment, re.M))
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    table = readme.split("\n## App environment\n", 1)[1].split("\n## ", 1)[0]
+    names = [name for row in table.splitlines() if row.startswith("| `ADSI_")
+             for name in re.findall(r"`(ADSI_[A-Z0-9_]+)`", row.split("|", 2)[1])]
+    assert len(names) == len(set(names)), "Duplicate README app variable"
+    assert set(names) == passed, ("README app environment differs from Compose", passed - set(names), set(names) - passed)
+
+
 def check_coverage():
     requirements = (ROOT / "docs/spec/requirements.md").read_text(encoding="utf-8")
     tests = (ROOT / "docs/test/verification.md").read_text(encoding="utf-8")
@@ -103,7 +116,8 @@ def check_graph_and_provider():
 
 if __name__ == "__main__":
     check_links()
+    check_readme_app_environment()
     check_coverage()
     check_wire()
     check_graph_and_provider()
-    print("Verified documentation links, requirement coverage, wire vectors, graph schema and weather fixture.")
+    print("Verified documentation links, app environment table, requirement coverage, wire vectors, graph schema and weather fixture.")

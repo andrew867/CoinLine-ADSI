@@ -2,27 +2,27 @@
 
 ## Compose topology
 
-Provide a Linux `compose.yaml` at the repository root with a default synthetic lab configuration. Use service health checks, deliberate startup and dependency reconnect rather than using startup timing as readiness. Use a pinned build manifest and OCI image digests for releases. Windows developers invoke Compose through MSYS2 MINGW64. [Packaging sources](../sources.md#s10-packaging-and-delivery)
+The root `compose.yaml` provides the Linux lab with synthetic data by default. Services use health checks and explicit startup dependencies. Windows developers invoke Compose through MSYS2 MINGW64. [Packaging sources](../sources.md#s10-packaging-and-delivery)
 
 | Service or job | Default configuration |
 | --- | --- |
-| `gateway` | Releases Asterisk SIP/RTP on the configured lab interface only. ARI and media WebSocket stay on the private network. Deny unknown endpoints and outbound dialing by default. |
+| `gateway` | Publishes Asterisk SIP/RTP on the configured lab interface only. ARI and media WebSocket stay on the private network. Unknown endpoints and outbound dialing are denied by default. |
 | `app` | Serves API, UI artifacts, call coordination and scheduled providers. Ready after schema compatibility and gateway availability. Public health returns only coarse readiness. |
 | `db` | Private PostgreSQL with persistent volume, readiness check and least-privilege service credentials. |
 | `migrate` | One-shot schema migration job, serialized with an advisory lock. Run it before readiness checks. Schema changes require a documented rollback or restored backup. |
-| `terminal-emu` | Optional headless software terminal on the lab network. Desktop/Web UI mode runs separately with a loopback listener. Use its own SIP identity. |
-| `fixtures` | Optional local deterministic fixture server for provider failures and seeded default data. Used in CI without live credentials. |
+| `terminal-emu` | Optional software SIP handset in the `verify` profile. The local browser UI starts a terminal container on each dial using the `lab` SIP credentials. |
+| `reference` | Isolated native Asterisk ADSI comparison gateway in the `verify` profile. |
 
-The web console binds to loopback in the default profile. A pilot sits behind a configured TLS reverse proxy and managed OIDC. Expose SIP and the declared narrow RTP range only where needed. Validate gateway address mappings through a two-way RTP test, including NAT if present. Keep Postgres, ARI and media sockets private. Use mounted secrets, controlled route enrollment and distinct credentials for gateway, app and admin. Give each container only the access it needs. The browser setup wizard configures applications, routes, profiles and providers using typed resource contracts, with a dry-run before applying changes.
+Fixtures are JSON files under `fixtures/`; they are not a Compose service. The web console binds to loopback by default. The Applications page edits and publishes application revisions and provides a fixture simulator. The Setup page shows incoming routes, validates and saves provider settings, and configures resident features. Shared deployment requires a configured TLS reverse proxy and OIDC. Expose SIP and the declared RTP range only where needed, verify two-way RTP and keep PostgreSQL, ARI and media sockets private. Use distinct credentials for gateway, app and admin.
 
 ## Asterisk build and load allowlists
 
-Build both images from an exact Asterisk 22 release or commit. Start with optional Menuselect modules disabled and enable the declared feature set plus its required dependencies. Keep the build selection and runtime module list in version control for each image. Use `autoload=no` and explicit module entries in `modules.conf`; mark indispensable modules as required at startup. Resolve transitive dependencies against the pinned source and verify them with a real call. [Asterisk build and module sources](../sources.md#s1-asterisk-pjsip-ari-and-media)
+The Dockerfile pins Asterisk 22.12.0 and its archive checksum. Menuselect builds only the declared feature sets and their dependencies. The build selection and runtime module lists are tracked. The gateway uses `autoload=no` with explicit module entries; the module check and SIP tests verify the packaged and loaded sets. [Asterisk build and module sources](../sources.md#s1-asterisk-pjsip-ari-and-media)
 
 | Image | Minimum feature set |
 | --- | --- |
 | Runtime gateway | `chan_pjsip`, the PJSIP resources needed for the configured endpoint and authentication, PCMU/RTP, a dialplan loader, Stasis and the ARI endpoints used for channel, event and bridge control, the bridge and timing resources, and `chan_websocket` with its dependencies for PCM. CoinLine's service generates ADSI on this path. |
-| Native ADSI reference | `chan_pjsip` with the minimum SIP, RTP, codec and dialplan dependencies, `res_adsi`, and a lab-only dialplan trigger that calls the native ADSI routines. Add `app_adsiprog` when needed for the P4 FDM reference tests. Run the reference image on an isolated lab network. |
+| Native ADSI reference | `chan_pjsip` with the minimum SIP, RTP, codec and dialplan dependencies, `res_adsi`, and a lab-only dialplan trigger that calls the native ADSI routines. Run the reference image on an isolated lab network. |
 
 Omit unused channel drivers, codecs, dialplan applications and connectors. Disable unused built-in services, including AMI. Keep ARI and the WebSocket listeners on the private network. The image check compares compiled, packaged and loaded module inventories against each reviewed allowlist and fails on missing requirements or unexpected additions. Verify SIP admission, media, ADSI signaling, voice fallback and teardown with the runtime gateway. Verify T09 with the reference image.
 
@@ -35,20 +35,20 @@ Omit unused channel drivers, codecs, dialplan applications and connectors. Disab
 
 ## GitHub Actions
 
-| Event | Required jobs and outputs |
+| Event | Workflow and outputs |
 | --- | --- |
-| Pull request | Verify Markdown, schema, fixtures and requirement mapping. Check dependency locks, lint/build the components, run unit and contract tests, start the isolated Compose stack and run emulator and browser scenarios. Run dependency and secret scanning with read-only token permissions. Store sanitized logs and test results. |
-| Default branch | Repeat required checks and build release candidates. Run scheduled extended media and regression cases with fixed seeds, a pinned gateway and a bounded artifact lifetime. |
-| Release tag | Build or promote tested images tied to the exact commit and pin digests. Generate SBOMs, scan dependency and image policy, attach provenance and publish to GHCR with release notes and the qualifying test matrix. Grant package write and attestation permissions only to release jobs. |
-| Environment promotion | Deploy by digest to staging, run health and a real SIP emulator smoke call, and record the exact versions. Production uses environment approval, scoped secrets and the same digest. Run the same smoke test and capture deployment and rollback outcomes. |
+| Pull request and main | `ci.yml` checks documentation, fixtures, Python and C++ tests, builds the lab, runs SIP and browser scenarios and verifies optional native modules. |
+| Scheduled | `ci.yml` repeats verification and runs capacity and resident persistence exercises. |
+| Release tag | `release.yml` builds, qualifies and publishes app and gateway images with SBOM and provenance, then records their digests. |
+| Environment promotion | `promote.yml` selects a published digest pair, runs a deployment smoke check and provides rollback on failure. The target runner and environment must be provisioned. |
 
-Lock action references to reviewed commit SHAs. Use branch protection and required checks on the default branch. Give untrusted pull requests no deployment secrets and no publish credentials. Hardware qualification and live-provider activation are documented approvals with their own evidence, independent of the green fixture workflow. Set up hosted workflows as soon as the independent repository exists. Release publishing and deployment require their respective target environments to be provisioned.
+Action references are pinned to reviewed commit SHAs. Use branch protection and required checks on `main`. Give untrusted pull requests no deployment secrets or publish credentials. Hardware qualification and live-provider activation have their own evidence requirements, independent of fixture verification. Release publishing and deployment require their respective target environments to be provisioned.
 
 ## Implementation layout
 
-| Directory | Future contents |
+| Directory | Contents |
 | --- | --- |
-| `service/` | Python call runtime, adapters, native DSP boundary, API and database migrations |
+| `service/` | Python call runtime, audio and ADSI generation, provider adapters, API and database migrations |
 | `web/` | React administration and browser simulator interface |
 | `terminal-emu/` | Standalone terminal executable, local UI and scenario runner |
 | `deploy/asterisk/` | Gateway image, dialplan and synthetic media profiles |

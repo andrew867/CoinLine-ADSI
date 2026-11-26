@@ -323,7 +323,7 @@ async def auth_callback(request: Request):
     request.session.clear()
     request.session["subject"] = subject
     if console:
-        configured = json.loads(os.getenv("ADSI_OIDC_OPERATOR_SUBJECTS", "{}"))
+        configured = json.loads(os.getenv("ADSI_OIDC_OPERATOR_SUBJECTS") or "{}")
         role = configured.get(identity["sub"])
         if role not in ("administrator", "publisher", "author", "viewer"):
             raise HTTPException(403, "Your account has no console role.")

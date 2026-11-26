@@ -4,7 +4,7 @@ The continuous-data profile remains the default. The alternative profile is opt-
 
 ## Verification
 
-- All 53 Python unit tests, C++ terminal vectors and source/fixture checks passed.
+- The Python unit suite at this milestone, C++ terminal vectors and source/fixture checks passed. The current suite count is listed in the [README](../../README.md#documentation-and-tests).
 - The standalone terminal decoded the separate explicit INFORMATION fixture and mixed voice/data PCM fixtures. The INFORMATION parameter was not emitted in the live alternative profile.
 - Isolated SIP peer calls passed both continuous-data and voice-between-screens, including keypad selection, softkey action, and final release.
 

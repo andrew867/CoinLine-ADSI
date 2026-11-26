@@ -27,4 +27,4 @@ The app and PostgreSQL restarted with the same published route. In a separate Co
 
 Vista 350 and ADSI-capable Millennium each require a separate T20 physical result. Physical resident features and Millennium graphics remain unqualified. Live news, market and lottery feeds require approved sources. Real balance access requires an enrolled private route, the institution and a terminal retention check.
 
-GitHub release, staging and production qualification require a repository owner, visibility and license decision, an authenticated publishing session and provisioned environments.
+The public repository has GitHub verification, release and promotion workflows. Release publication and staging or production qualification require provisioned target environments.

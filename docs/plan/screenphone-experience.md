@@ -34,4 +34,4 @@ Set provider setting `parcel` to `true` and configure `ADSI_FEDEX_CLIENT_ID` and
 
 ## Additional service candidates
 
-Phone-friendly next additions include regional transit and ferry schedules, road closures and weather alerts, local event listings, and public-service contacts. A public catalogue with text-based search and a human handoff fits the original screenphone concept without requiring an online purchase or collecting payment details. Keep each new external provider individually configurable and separately test fixture and live behavior.
+Local event listings and public-service contacts remain candidates. Road and ferry reports, weather alerts and transit schedules are already part of the [travel revision](nl-travel.md). Any new provider should be individually configurable, with separate fixture and live verification.

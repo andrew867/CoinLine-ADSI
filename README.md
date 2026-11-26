@@ -2,7 +2,7 @@
 
 [![Verification](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml/badge.svg)](https://github.com/andrew867/CoinLine-ADSI/actions/workflows/ci.yml)
 
-CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine** presents Canadian regional headlines, weather, stock quotes, lottery draw results, airport flight boards, visual directory assistance, cinema showtimes, parcel tracking, Newfoundland road and ferry reports, weather alerts and transit schedules, with fixture, live or manual provenance as configured. Read-only banking is optional. Operators can build and test call flows in a browser. A standalone PJSUA2 terminal exercises signaling over SIP/RTP.
+CoinLine ADSI is a lab server for analog display telephones. **CoinLine InfoLine** presents Canadian regional headlines, weather, stock quotes, lottery draw results, airport flight boards, visual directory assistance, cinema showtimes, parcel tracking, Newfoundland road and ferry reports, weather alerts and transit schedules, with fixture, live or manual provenance as configured. Read-only banking is optional. A separate **ShadyBank** application supports virtual ShadyBucks member banking, including transfers, on an authenticated extension. Operators can build and test call flows in a browser. A standalone PJSUA2 terminal exercises signaling over SIP/RTP.
 
 ## Quick start
 
@@ -35,6 +35,7 @@ Open the operator console at `http://127.0.0.1:8080` and sign in with the genera
 | [Extra InfoLine services](docs/plan/extra-services.md) | Airport keypad search, flight boards, directory, optional native voicemail and resident launcher |
 | [Screenphone experience and local services](docs/plan/screenphone-experience.md) | Information-first layouts, paging, cinema and parcel tracking, credentials and qualification |
 | [Newfoundland travel services](docs/plan/nl-travel.md) | NL511 reports, ferry status, ECCC warnings, Metrobus bulletins and scheduled departures |
+| [ShadyBank telephone banking](docs/plan/shadybank.md) | Separate member extension, card and PIN login, balances, history, holds, transfers and deployment contract |
 | [CoinLine-emu PSTN integration handoff](docs/plan/millennium-interop.md) | Dedicated 2374 SIP ingress, simulator routing, PCM contract and acceptance gates |
 | [Local lab results](docs/status/local-lab.md) | Verified exchanges, recovery drills and qualification status |
 | [Canadian InfoLine lab results](docs/status/regional-lab.md) | Provider responses, caller ID, finance and regional lottery verification |

@@ -10,11 +10,11 @@ from fastapi import FastAPI, Request, WebSocket
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import directory, fdm, flights, graph, parcel, travel
+from . import directory, fdm, flights, graph, parcel, shadybank, travel
 from .api import api, login
 from .asterisk import Gateway
 from .balances import ProviderUnavailable, demo_balance
-from .link import CONTINUOUS_DATA, lab_call
+from .link import CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS, lab_call
 from .private import PrivateBalances, configure
 from .providers import Providers, choose_site, prefix
 from .regional import CAPITALS, choose, choose_weather
@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     app.state.failures = deque()
     app.state.db = Store() if os.getenv("ADSI_DB_HOST") else None
     app.state.providers = Providers()
+    app.state.shadybank, app.state.shadybank_demo = shadybank.configured(app.state.providers.client)
     private_key = app.state.oidc[2] if app.state.oidc else (
         bytes.fromhex(os.environ["ADSI_DATA_KEY"]) if os.getenv("ADSI_LOCAL_BANK_ENROLLMENT") == "1" else None)
     app.state.private = PrivateBalances(app.state.db, app.state.providers.client, private_key) if (
@@ -45,6 +46,9 @@ async def lifespan(app: FastAPI):
             return
         if route == "balance-demo":
             await demo_balance(link, say, os.getenv("ADSI_DEMO_PIN", ""))
+            return
+        if route == "shadybank":
+            await shadybank.call(app.state.shadybank, app.state.shadybank_demo, link, say)
             return
         if route == "private-balance":
             private = app.state.private
@@ -213,7 +217,8 @@ async def lifespan(app: FastAPI):
             emu_profile = (os.getenv("ADSI_EMU_INTERACTION_PROFILE", CONTINUOUS_DATA)
                            if os.getenv("ADSI_EMU_ENABLE") == "1" else CONTINUOUS_DATA)
             app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call, emu_alert_delay=emu_delay,
-                                        emu_interaction_profile=emu_profile)
+                                        emu_interaction_profile=emu_profile,
+                                        shadybank_profile=os.getenv("ADSI_SHADYBANK_INTERACTION_PROFILE", VOICE_BETWEEN_SCREENS))
             task = asyncio.create_task(app.state.gateway.serve())
         yield
     finally:

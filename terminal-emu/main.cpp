@@ -527,7 +527,7 @@ int main(int argc, char **argv)
             account.create(config);
             for (long index = 0; index < repetitions; ++index) {
                 const Json result = runCall(endpoint, account, scenario, "sip:" + extension + "@" + host,
-                                            extension == "6504" || extension == "6505");
+                                            extension == "6504" || extension == "6505" || extension == "6508");
                 std::cout << result.dump() << std::endl;
                 passed &= result["passed"].get<bool>();
                 if (index + 1 < repetitions) {

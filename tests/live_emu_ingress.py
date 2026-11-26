@@ -111,7 +111,7 @@ def main():
                 subprocess.run(['docker', 'stop', '--time', '1', name], timeout=15, check=False,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-    for digits in ('6500', '6501', '6503', '6504', '6505'):
+    for digits in ('6500', '6501', '6503', '6504', '6505', '6508'):
         result = subprocess.run(command('coinline-emu-denied-' + uuid4().hex[:10], digits),
                                 input='', capture_output=True, text=True, timeout=35)
         reports = [json.loads(line) for line in result.stdout.splitlines() if line.startswith('{')]

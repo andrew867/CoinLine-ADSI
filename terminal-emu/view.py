@@ -30,7 +30,7 @@ class Dialer:
             if self.call and self.call.poll() is None:
                 return False
             self.reset()
-            self.state["private"] = ext in ("6504", "6505")
+            self.state["private"] = ext in ("6504", "6505", "6508")
             environment = dict(os.environ)
             environment.pop("ADSI_EMULATOR_CALLER_ID", None)
             if caller:

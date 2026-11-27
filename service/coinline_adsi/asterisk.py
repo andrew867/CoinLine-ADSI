@@ -83,13 +83,25 @@ class Admission:
 CallHandler = Callable[[str, str | None, Link, Callable[[str], Awaitable[None]]], Awaitable[None]]
 
 
+CO_LAN_ROUTES = {
+    "co-lan-lab": "lab",
+    "co-lan-infoline": "infoline",
+    "co-lan-balance-demo": "balance-demo",
+    "co-lan-resident-lab": "resident-lab",
+    "co-lan-shadybank": "shadybank",
+}
+
+
 class Gateway:
     def __init__(self, base: str, password: str, handler: CallHandler, limit: int = 10,
                  emu_alert_delay: float = 1.0, emu_interaction_profile: str = CONTINUOUS_DATA,
-                 shadybank_profile: str = VOICE_BETWEEN_SCREENS):
+                 shadybank_profile: str = VOICE_BETWEEN_SCREENS,
+                 co_lan_alert_delay: float = 1.0, co_lan_profile: str = VOICE_BETWEEN_SCREENS):
         if not 0.25 <= emu_alert_delay <= 5.0:
             raise ValueError("Emulator first-alert delay must be 250 to 5000 ms.")
-        if emu_interaction_profile not in PROFILES or shadybank_profile not in PROFILES:
+        if not 0.25 <= co_lan_alert_delay <= 5.0:
+            raise ValueError("LAN lab first-alert delay must be 250 to 5000 ms.")
+        if emu_interaction_profile not in PROFILES or shadybank_profile not in PROFILES or co_lan_profile not in PROFILES:
             raise ValueError("Unknown emulator interaction profile.")
         self.base = base.rstrip("/")
         self.authorization = "Basic " + base64.b64encode(f"{APP}:{password}".encode()).decode()
@@ -99,6 +111,8 @@ class Gateway:
         self.emu_alert_delay = emu_alert_delay
         self.emu_interaction_profile = emu_interaction_profile
         self.shadybank_profile = shadybank_profile
+        self.co_lan_alert_delay = co_lan_alert_delay
+        self.co_lan_profile = co_lan_profile
         self.connected = False
         self.calls: dict[str, Admission] = {}
         self.pending: dict[str, Admission] = {}
@@ -107,9 +121,13 @@ class Gateway:
         self.lab_audio: dict[str, bytes] = {}
 
     def first_alert_delay(self, route: str) -> float:
+        if route in CO_LAN_ROUTES:
+            return self.co_lan_alert_delay
         return self.emu_alert_delay if route == "emu-infoline" else 0.25
 
     def interaction_profile(self, route: str) -> str:
+        if route in CO_LAN_ROUTES:
+            return CONTINUOUS_DATA if route == "co-lan-resident-lab" else self.co_lan_profile
         if route == "shadybank":
             return self.shadybank_profile
         return self.emu_interaction_profile if route == "emu-infoline" else CONTINUOUS_DATA
@@ -212,7 +230,7 @@ class Gateway:
                              profile=self.interaction_profile(route))
 
             async def say(text):
-                pcm = self.lab_audio.get(text) if route == "lab" else None
+                pcm = self.lab_audio.get(text) if route in ("lab", "co-lan-lab") else None
                 if pcm is None:
                     pcm = await audio.speech(text)
                 call.link.response_begin()

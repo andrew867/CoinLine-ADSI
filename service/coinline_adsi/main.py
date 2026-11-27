@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import directory, fdm, flights, graph, parcel, shadybank, travel
 from .api import api, login
-from .asterisk import Gateway
+from .asterisk import CO_LAN_ROUTES, Gateway
 from .balances import ProviderUnavailable, demo_balance
 from .link import CONTINUOUS_DATA, VOICE_BETWEEN_SCREENS, lab_call
 from .private import PrivateBalances, configure
@@ -48,6 +48,15 @@ async def lifespan(app: FastAPI):
                                    os.getenv("ADSI_SIP_BIND") == "127.0.0.1")
 
     async def handle_call(route, caller, link, say):
+        if route.startswith("co-lan-"):
+            mapped = CO_LAN_ROUTES.get(route)
+            if os.getenv("ADSI_CO_LAN_ENABLE") != "1" or mapped is None:
+                await say("LAN lab service unavailable.")
+                return
+            if mapped == "shadybank" and not app.state.shadybank_demo:
+                await say("ShadyBank is unavailable.")
+                return
+            route = mapped
         if route == "emu-infoline" and os.getenv("ADSI_EMU_ENABLE") != "1":
             await say("Emulator service unavailable.")
             return
@@ -228,7 +237,9 @@ async def lifespan(app: FastAPI):
                            if os.getenv("ADSI_EMU_ENABLE") == "1" else CONTINUOUS_DATA)
             app.state.gateway = Gateway(origin, os.environ["ADSI_ARI_PASSWORD"], handle_call, emu_alert_delay=emu_delay,
                                         emu_interaction_profile=emu_profile,
-                                        shadybank_profile=os.getenv("ADSI_SHADYBANK_INTERACTION_PROFILE", VOICE_BETWEEN_SCREENS))
+                                        shadybank_profile=os.getenv("ADSI_SHADYBANK_INTERACTION_PROFILE", VOICE_BETWEEN_SCREENS),
+                                        co_lan_alert_delay=int(os.getenv("ADSI_CO_LAN_ALERT_DELAY_MS", "1000")) / 1000,
+                                        co_lan_profile=os.getenv("ADSI_CO_LAN_INTERACTION_PROFILE", VOICE_BETWEEN_SCREENS))
             task = asyncio.create_task(app.state.gateway.serve())
             task.add_done_callback(report_gateway_stop)
         yield

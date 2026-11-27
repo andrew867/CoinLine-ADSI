@@ -26,6 +26,10 @@ FROM source AS source-emu
 COPY --chmod=755 deploy/asterisk/build-emu.sh /build/
 RUN /build/build-emu.sh
 
+FROM source AS source-co-lan
+COPY --chmod=755 deploy/asterisk/build-co-lan.sh /build/
+RUN /build/build-co-lan.sh
+
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates libedit2 libjansson4 libsqlite3-0 libssl3 libxml2 libuuid1 \
@@ -52,6 +56,14 @@ COPY --from=source-emu /profiles/emu/allowlist /opt/coinline/modules
 COPY --chown=asterisk:asterisk --from=source-emu /image/var/lib/asterisk/ /var/lib/asterisk/
 USER asterisk
 CMD ["gateway"]
+
+FROM runtime AS gateway-co-lan
+COPY --from=source-co-lan /image/usr/sbin/asterisk /usr/sbin/
+COPY --from=source-co-lan /profiles/co-lan/modules/ /usr/lib/asterisk/modules/
+COPY --from=source-co-lan /profiles/co-lan/allowlist /opt/coinline/modules
+COPY --chown=asterisk:asterisk --from=source-co-lan /image/var/lib/asterisk/ /var/lib/asterisk/
+USER asterisk
+CMD ["co-lan"]
 
 FROM runtime AS reference
 COPY --from=source /image/usr/sbin/asterisk /usr/sbin/

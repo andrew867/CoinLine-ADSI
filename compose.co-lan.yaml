@@ -1,0 +1,49 @@
+# Isolated synthetic CO laboratory. Never combine with the other overlays.
+name: coinline-adsi-co-lan
+services:
+  gateway:
+    image: ${ADSI_CO_LAN_GATEWAY_IMAGE:-coinline-adsi-co-lan-gateway}
+    build:
+      target: gateway-co-lan
+      args:
+        ADSI_NATIVE_MAIL: "1"
+    environment:
+      ADSI_CO_LAN_ENABLE: "1"
+      ADSI_CO_LAN_BIND: ${ADSI_CO_LAN_BIND:?Set the private LAN host IPv4 address}
+      ADSI_CO_LAN_PEER: ${ADSI_CO_LAN_PEER:?Set the exact authorized CO IPv4 address}
+      ADSI_CO_LAN_CALLER_ID: ${ADSI_CO_LAN_CALLER_ID:-7095550100}
+      ADSI_NATIVE_MAIL_PIN: ${ADSI_NATIVE_MAIL_PIN:?Run deploy/init_lab.py}
+    ports: !override
+      - "${ADSI_CO_LAN_BIND:?Set the private LAN host IPv4 address}:5070:5070/udp"
+      - "${ADSI_CO_LAN_BIND:?Set the private LAN host IPv4 address}:18200-18239:18200-18239/udp"
+    volumes:
+      - native-mail:/var/spool/asterisk
+  app:
+    image: ${ADSI_CO_LAN_APP_IMAGE:-coinline-adsi-co-lan-app}
+    environment:
+      ADSI_CO_LAN_ENABLE: "1"
+      ADSI_CO_LAN_ALERT_DELAY_MS: ${ADSI_CO_LAN_ALERT_DELAY_MS:-1000}
+      ADSI_CO_LAN_INTERACTION_PROFILE: ${ADSI_CO_LAN_INTERACTION_PROFILE:-voice-between-screens}
+      ADSI_LOCAL_BANK_ENROLLMENT: "0"
+      ADSI_LOCAL_PRIVATE_CALLS: "0"
+      ADSI_PRIVATE_BALANCES: "0"
+      ADSI_WEB_ORIGIN: ""
+      ADSI_OIDC_DISCOVERY: ""
+      ADSI_OIDC_CLIENT: ""
+      ADSI_OIDC_SECRET: ""
+      ADSI_OIDC_OPERATOR_SUBJECTS: ""
+      ADSI_SHADYBANK_MODE: "demo"
+      ADSI_SHADYBANK_URL: ""
+      ADSI_SHADYBANK_SERVICE_KEY: ""
+      ADSI_FDM_ENABLE: ${ADSI_CO_LAN_FDM_ENABLE:-0}
+      ADSI_SIP_BIND: ${ADSI_CO_LAN_BIND:?Set the private LAN host IPv4 address}
+    ports: !override
+      - "127.0.0.1:${ADSI_CO_LAN_WEB_PORT:-8090}:8080"
+  migrate:
+    image: ${ADSI_CO_LAN_APP_IMAGE:-coinline-adsi-co-lan-app}
+  terminal-emu:
+    image: ${ADSI_CO_LAN_TERMINAL_IMAGE:-coinline-adsi-co-lan-terminal}
+volumes:
+  db:
+    name: ${ADSI_CO_LAN_DB_VOLUME:-coinline-adsi-co-lan_db}
+  native-mail: {}

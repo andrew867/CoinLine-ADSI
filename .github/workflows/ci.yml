@@ -104,3 +104,26 @@ jobs:
           docker compose -f compose.yaml -f compose.native.yaml build gateway
           docker compose -f compose.yaml -f compose.native.yaml up -d --no-deps --wait gateway
           sh tests/check-native.sh
+  co-lan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ADSI_CO_LAN_BIND: 192.168.254.1
+      ADSI_CO_LAN_PEER: 192.168.254.2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build and inspect the isolated source-restricted LAN gateway
+        run: |
+          python deploy/init_lab.py
+          docker compose -f compose.yaml -f compose.co-lan.yaml build gateway
+          # A run container does not publish the configured host ports.
+          docker compose -f compose.yaml -f compose.co-lan.yaml run -d --no-deps --name coinline-adsi-ci-co-lan gateway
+          for i in $(seq 1 30); do
+            if [ "$(docker inspect --format '{{.State.Health.Status}}' coinline-adsi-ci-co-lan)" = healthy ]; then break; fi
+            sleep 1
+          done
+          test "$(docker inspect --format '{{.State.Health.Status}}' coinline-adsi-ci-co-lan)" = healthy
+          sh tests/check-co-lan.sh coinline-adsi-ci-co-lan
+      - name: Show diagnostics on failure
+        if: failure()
+        run: docker logs --tail=80 coinline-adsi-ci-co-lan || true

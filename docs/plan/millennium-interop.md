@@ -2,6 +2,8 @@
 
 The server can now accept a direct local SIP call to InfoLine without a registrar. The emulated telephone must experience an ordinary answered analogue call; there is no ADSI-specific application RPC between the simulator and the server. The terminal under test is a Millennium running user supplied ADSI compatible terminal firmware.
 
+For a source-restricted CO on a separate private LAN host, use the [dedicated LAN laboratory](co-lan.md). The loopback-only service documented here remains unchanged and exposes only 2374.
+
 ## Start the optional service
 
 Run these commands from the CoinLine ADSI repository, using MSYS2 MINGW64 on Windows:

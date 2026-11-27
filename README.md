@@ -53,6 +53,8 @@ The handset UI accepts an optional synthetic caller ID. A configured NPA-NXX ass
 
 The standard extensions require the authenticated `lab` SIP endpoint. The emulator-only 2374 route cannot reach any of extensions 6500-6508. See [running the lab](docs/plan/running.md), [native mail and resident features](docs/plan/extra-services.md) and [ShadyBank](docs/plan/shadybank.md) for setup instructions.
 
+For a dedicated, source-restricted CO on a private LAN, the [separate LAN laboratory](docs/plan/co-lan.md) provides exact synthetic service routes without SIP registration. The private-balance extension 6504 is excluded.
+
 ## Connecting a telephone
 
 ### CoinLine-emu
@@ -145,7 +147,7 @@ The host port settings are `ADSI_SIP_PORT` (5060) and `ADSI_WEB_PORT` (8080). `A
 - [Data and access](docs/spec/data-and-access.md), [regional providers](docs/spec/regional-providers.md), [screenphone services](docs/plan/screenphone-experience.md), [NL travel](docs/plan/nl-travel.md), [ShadyBank](docs/plan/shadybank.md)
 - [Local lab results](docs/status/local-lab.md), [Canadian provider tests](docs/status/regional-lab.md), [sources](docs/sources.md)
 
-To run the 83 Python unit tests and design checks without a SIP server:
+To run the 86 Python unit tests and design checks without a SIP server:
 
 ```sh
 python -m pip install -r service/requirements.txt
